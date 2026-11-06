@@ -5,7 +5,15 @@ set -e
 cd "$(dirname "$0")"
 NAME="${1:-tournament-bracket}"
 
-command -v gh >/dev/null || { echo "gh をインストールします..."; brew install gh; }
+if ! command -v gh >/dev/null; then
+  if command -v brew >/dev/null; then
+    echo "gh をインストールします..."; brew install gh
+  else
+    echo "❌ GitHub CLI (gh) が見つかりません。"
+    echo "   https://cli.github.com から macOS 用インストーラ(.pkg)を入れ、ターミナルを開き直してから再実行してください。"
+    exit 1
+  fi
+fi
 gh auth status >/dev/null 2>&1 || gh auth login
 
 [ -d .git ] || git init -b main
