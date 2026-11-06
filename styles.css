@@ -242,3 +242,8 @@ img[src$=".svg"], img[src$=".png"][src^="mc/"] { image-rendering: pixelated; }
   100% { transform: translate(-50%, 140%); opacity: 0; }
 }
 .announce { animation: announce-in 5.5s ease-in-out forwards; }
+
+/* ---- カスタム線色 (設定で変更) ---- */
+.mc-theme .bracket-svg.bracket-custom path { stroke-linecap: square; }
+.mc-theme .bracket-svg.bracket-custom path[data-active] { filter: drop-shadow(0 0 6px var(--line-glow)) !important; }
+.bracket-svg.bracket-custom path[data-active] { filter: drop-shadow(0 0 8px var(--line-glow)); }

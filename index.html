@@ -283,6 +283,8 @@
       if (d && d.bgTheme === 'custom') return { ...def, type: d.customBgUrl ? 'image' : 'theme', image: d.customBgUrl || '' };
       return def;
     };
+    const DEFAULT_LINES = { mode: 'theme', base: '#ffffff', baseAlpha: 30, active: '#ffffff', width: 16 };
+    const normLines = (d) => ({ ...DEFAULT_LINES, ...((d && d.lineStyle) || {}) });
     const adminLogin = async () => {
       const pw = window.prompt('管理者パスワードを入力してください');
       if (!pw) return;
@@ -779,6 +781,8 @@
       const [tournamentSubtitle, setTournamentSubtitle] = useState(saved?.tournamentSubtitle ?? 'Geoguessr Tournament Bracket');
       const [bgTheme, setBgTheme] = useState(THEMES[saved?.bgTheme] ? saved.bgTheme : (saved?.bgTheme === 'custom' ? 'dark' : 'earth'));
       const [bg, setBg] = useState(() => normBg(saved));
+      const [lineStyle, setLineStyle] = useState(() => normLines(saved));
+      const setLinePart = (patch) => setLineStyle(prev => ({ ...prev, ...patch, mode: 'custom' }));
       const setBgPart = (patch) => setBg(prev => ({ ...prev, ...patch }));
       const [showPlayoff, setShowPlayoff] = useState(false);
       const [synced, setSynced] = useState(!!saved);
@@ -1475,6 +1479,11 @@
       // 角は丸くしつつ、接合部分 of 白丸ポッチを防ぐために一筆書きパスとLinejoinを活用。一段目の棒（垂直線）は省略。
       const renderRoads = () => {
         const paths = [];
+        const customLines = lineStyle.mode === 'custom';
+        const baseExtra = customLines ? { style: { stroke: lineStyle.base, strokeOpacity: lineStyle.baseAlpha / 100, strokeWidth: lineStyle.width } } : {};
+        const activeStyle = customLines
+          ? { stroke: lineStyle.active, strokeWidth: lineStyle.width, transition: 'stroke 0.4s, filter 0.4s' }
+          : { filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))', transition: 'stroke 0.4s, filter 0.4s' };
 
         matches.forEach((round, rIndex) => {
           const isFinalRound = rIndex === matches.length - 1;
@@ -1529,6 +1538,7 @@
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     fill="none"
+                    {...baseExtra}
                   />
                   {/* グレー背景線（右） */}
                   <path
@@ -1538,6 +1548,7 @@
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     fill="none"
+                    {...baseExtra}
                   />
                   {/* アクティブな白光り線（進出した場合のみ重ねる） */}
                   {isP1Active && (
@@ -1548,10 +1559,8 @@
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       fill="none"
-                      style={{
-                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))',
-                        transition: 'stroke 0.4s, filter 0.4s'
-                      }}
+                      data-active="1"
+                      style={activeStyle}
                     />
                   )}
                   {isP2Active && (
@@ -1562,10 +1571,8 @@
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       fill="none"
-                      style={{
-                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))',
-                        transition: 'stroke 0.4s, filter 0.4s'
-                      }}
+                      data-active="1"
+                      style={activeStyle}
                     />
                   )}
                 </g>
@@ -1588,6 +1595,7 @@
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     fill="none"
+                    {...baseExtra}
                   />
                   {/* グレー背景線（右） */}
                   <path
@@ -1597,6 +1605,7 @@
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     fill="none"
+                    {...baseExtra}
                   />
                   {/* アクティブな白光り線（進出した場合のみ重ねる） */}
                   {isP1Active && (
@@ -1607,10 +1616,8 @@
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       fill="none"
-                      style={{
-                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))',
-                        transition: 'stroke 0.4s, filter 0.4s'
-                      }}
+                      data-active="1"
+                      style={activeStyle}
                     />
                   )}
                   {isP2Active && (
@@ -1621,10 +1628,8 @@
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       fill="none"
-                      style={{
-                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))',
-                        transition: 'stroke 0.4s, filter 0.4s'
-                      }}
+                      data-active="1"
+                      style={activeStyle}
                     />
                   )}
                 </g>
@@ -1634,7 +1639,7 @@
         });
 
         return (
-          <svg className="bracket-svg absolute inset-0 w-full h-full pointer-events-none z-10">
+          <svg className={`bracket-svg ${lineStyle.mode === 'custom' ? 'bracket-custom' : ''} absolute inset-0 w-full h-full pointer-events-none z-10`} style={{ '--line-glow': lineStyle.active }}>
             {paths}
           </svg>
         );
@@ -1723,14 +1728,14 @@
       const snapshot = () => ({
         kind: 'bracket-maker-save', version: 2,
         playerCount, players, matches, championId, customNames, customFlags, playerHp,
-        tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage, playoffs,
+        tournamentTitle, tournamentSubtitle, bgTheme, bg, lineStyle, rules, repechage, playoffs,
       });
 
       useEffect(() => {
         if (!matches.length || RO) return;
         const ok = saveJSON(STORAGE_KEY, snapshot());
         setSaveState(ok ? 'saved' : 'error');
-      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage, playoffs]);
+      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, lineStyle, rules, repechage, playoffs]);
 
       // 管理者 → サーバーへ送信 (観戦者へリアルタイム配信される)
       useEffect(() => {
@@ -1745,7 +1750,7 @@
           } catch (e) { setSyncState('err'); }
         }, 250);
         return () => clearTimeout(t);
-      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage, playoffs, showRanking, view, liveMirror]);
+      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, lineStyle, rules, repechage, playoffs, showRanking, view, liveMirror]);
 
       const applySaved = (d, keepView) => {
         if (d.playerCount !== playerCount) skipInit.current = true;
@@ -1760,6 +1765,7 @@
         setTournamentSubtitle(d.tournamentSubtitle || '');
         setBgTheme(THEMES[d.bgTheme] ? d.bgTheme : 'dark');
         setBg(normBg(d));
+        setLineStyle(normLines(d));
         setRules(mergeRules(d.rules));
         setRepechage(d.repechage || null);
         setPlayoffs(d.playoffs || []);
@@ -2303,6 +2309,47 @@
                     </div>
                   )}
                   <p className="text-[10px] text-slate-500 mt-1">背景は観戦者の画面にも反映されます。</p>
+                </Field>
+                <Field label="トーナメントの線">
+                  <div className="grid grid-cols-2 gap-1">
+                    {[['theme', 'テーマ標準'], ['custom', 'カスタム']].map(([k, label]) => (
+                      <button key={k} onClick={() => setLineStyle(prev => ({ ...prev, mode: k }))}
+                        className={`py-1.5 text-xs font-bold border cursor-pointer ${lineStyle.mode === k ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'}`}>{label}</button>
+                    ))}
+                  </div>
+                  {lineStyle.mode === 'custom' && (
+                    <div className="mt-2 space-y-3">
+                      <div>
+                        <div className="text-[11px] text-slate-400 mb-1">進出した線の色 (勝ち上がり)</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <input type="color" value={lineStyle.active} onChange={(e) => setLinePart({ active: e.target.value })} className="h-8 w-12 cursor-pointer bg-transparent" />
+                          {['#ffffff', '#000000', '#ffe600', '#ff3b3b', '#39ff14', '#00e5ff', '#ff4fd8'].map(c => (
+                            <button key={c} onClick={() => setLinePart({ active: c })} className="w-6 h-6 border border-slate-500 cursor-pointer" style={{ background: c }} />
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] text-slate-400 mb-1">未進出の線の色 (枠線)</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <input type="color" value={lineStyle.base} onChange={(e) => setLinePart({ base: e.target.value })} className="h-8 w-12 cursor-pointer bg-transparent" />
+                          {['#ffffff', '#000000', '#94a3b8', '#ffe600', '#ff3b3b', '#39ff14', '#00e5ff'].map(c => (
+                            <button key={c} onClick={() => setLinePart({ base: c })} className="w-6 h-6 border border-slate-500 cursor-pointer" style={{ background: c }} />
+                          ))}
+                        </div>
+                      </div>
+                      <label className="block text-[11px] text-slate-400">未進出の線の濃さ: {lineStyle.baseAlpha}%
+                        <input type="range" min="10" max="100" step="5" value={lineStyle.baseAlpha} onChange={(e) => setLinePart({ baseAlpha: Number(e.target.value) })} className="w-full" />
+                      </label>
+                      <label className="block text-[11px] text-slate-400">線の太さ: {lineStyle.width}
+                        <input type="range" min="4" max="28" step="1" value={lineStyle.width} onChange={(e) => setLinePart({ width: Number(e.target.value) })} className="w-full" />
+                      </label>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button onClick={() => setLineStyle({ mode: 'custom', base: '#000000', baseAlpha: 45, active: '#ffe600', width: 14 })} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] py-1.5 cursor-pointer">明るい背景向け (黒+黄)</button>
+                        <button onClick={() => setLineStyle({ mode: 'custom', base: '#ffffff', baseAlpha: 35, active: '#39ff14', width: 14 })} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] py-1.5 cursor-pointer">暗い背景向け (白+緑)</button>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-500 mt-1">背景が明るくて線が見づらいときは、色や太さを変えてください。観戦者の画面にも反映されます。</p>
                 </Field>
                 <Field label="参加人数 (3〜32人)">
                   <input type="number" min="3" max="32" value={playerCount}
