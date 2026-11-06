@@ -780,6 +780,7 @@
       const [bgTheme, setBgTheme] = useState(THEMES[saved?.bgTheme] ? saved.bgTheme : (saved?.bgTheme === 'custom' ? 'dark' : 'earth'));
       const [bg, setBg] = useState(() => normBg(saved));
       const setBgPart = (patch) => setBg(prev => ({ ...prev, ...patch }));
+      const [showPlayoff, setShowPlayoff] = useState(false);
       const [synced, setSynced] = useState(!!saved);
       const [syncState, setSyncState] = useState(SERVER ? 'ok' : 'local');
       const lastRemoteChamp = useRef(saved?.championId ?? null);
@@ -1081,7 +1082,7 @@
       const tieGroups = useMemo(() => {
         const g = {};
         computeRankings.forEach(e => { (g[e.baseKey] = g[e.baseKey] || []).push(e); });
-        return Object.values(g).filter(a => a.length >= 2 && a.length <= 8);
+        return Object.values(g).filter(a => a.length >= 2 && a.length <= 8 && !a[0].isAlive);
       }, [computeRankings]);
       const playoffCreate = (group) => {
         const ids = group.map(e => e.player.id);
@@ -1903,6 +1904,76 @@
         setBulkText('');
       };
 
+      // 同順位決定戦カード (順位表・トーナメント画面の両方で使う)
+      const renderPlayoffCards = () => tieGroups.map(group => {
+                      const ids = new Set(group.map(e => e.player.id));
+                      const ms = playoffs.filter(m => !m.ids && ids.has(m.a) && ids.has(m.b));
+                      const ffs = playoffs.filter(m => m.ids && m.ids.every(x => ids.has(x)));
+                      if (RO && ms.length === 0 && ffs.length === 0) return null;
+                      const nm = (id) => (pmap[id] || {}).name || '?';
+                      const need = group.length * (group.length - 1) / 2 - ms.length;
+                      // 決定戦の成績がまだ同じ選手のまとまり (同時対戦の対象)
+                      const open = Object.values(group.reduce((acc, e) => { (acc[e.poKey] = acc[e.poKey] || []).push(e.player.id); return acc; }, {})).filter(a => a.length >= 2);
+                      const openNow = open.filter(a => !ffs.some(f => f.order.length < f.ids.length && f.ids.length === a.length && f.ids.every(x => a.includes(x))));
+                      return (
+                        <div key={group.map(e => e.player.id).join('-')} className="po-card border-2 border-amber-500/60 bg-amber-950/20 p-4 rounded-2xl">
+                          <div className="font-black text-amber-300 text-lg">⚔ 同順位決定戦 <span className="text-sm text-amber-200/80 font-bold">{group.map(e => e.player.name).join(' / ')} (#{group[0].rank} タイ)</span></div>
+
+                          {ffs.map((f, fi) => (
+                            <div key={f.id} className="mt-3 border border-amber-500/40 p-3 bg-slate-950/40">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs font-black text-amber-200">🎮 同時対戦 {fi + 1} ({f.ids.length}人)</div>
+                                {!RO && <button onClick={() => playoffRemove(f.id)} className="text-[10px] text-slate-400 hover:text-red-400 cursor-pointer">✕ 削除</button>}
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {f.ids.map(id => {
+                                  const pos = f.order.indexOf(id);
+                                  return (
+                                    <button key={id} disabled={RO} onClick={() => playoffFfaToggle(f.id, id)}
+                                      className={`px-2 py-2 text-sm font-black border-2 ${RO ? '' : 'cursor-pointer'} ${pos >= 0 ? 'bg-emerald-700 border-emerald-300 text-white' : 'bg-slate-800 border-slate-600 hover:border-amber-400 text-white'}`}>
+                                      <div className="text-[11px] text-amber-200">{pos >= 0 ? `${pos + 1}位` : '未入力'}</div>
+                                      {nm(id)}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {!RO && <div className="text-[10px] text-slate-400 mt-2">上位の人から順に押して、同時対戦での順位を記録します(もう一度押すと取り消し)。残り1人は自動で最下位になります。</div>}
+                            </div>
+                          ))}
+
+                          {ms.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              <div className="text-xs font-black text-amber-200">⚔ 1対1の決定戦</div>
+                              {ms.map(m => (
+                                <div key={m.id} className="flex items-center gap-2 text-white">
+                                  {['a', 'b'].map((side, i) => (
+                                    <React.Fragment key={side}>
+                                      {i === 1 && <span className="text-slate-500 text-xs font-black">VS</span>}
+                                      <button disabled={RO} onClick={() => playoffPick(m.id, side)}
+                                        className={`flex-1 px-3 py-2 text-sm font-black border-2 ${RO ? '' : 'cursor-pointer'} ${m.w === side ? 'bg-emerald-600 border-emerald-300 text-white' : m.w ? 'bg-slate-900/60 border-slate-700 text-slate-500 line-through' : 'bg-slate-800 border-slate-600 hover:border-amber-400'}`}>
+                                        {m.w === side ? '🏆 ' : ''}{nm(m[side])}
+                                      </button>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {!RO && (
+                            <div className="mt-3 flex gap-2 flex-wrap">
+                              {openNow.map(a => (
+                                <button key={a.join(',')} onClick={() => playoffFfaCreate(a)} className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black px-3 py-1.5 cursor-pointer">🎮 {a.length}人で同時に対戦して順位を記録</button>
+                              ))}
+                              {need > 0 && <button onClick={() => playoffCreate(group)} className="bg-slate-800 hover:bg-slate-700 border border-amber-500/60 text-amber-200 text-xs font-black px-3 py-1.5 cursor-pointer">{ms.length ? '1対1: 不足分を追加' : '1対1の総当たりにする'}</button>}
+                              {(ms.length > 0 || ffs.length > 0) && <button onClick={() => playoffClear(group)} className="bg-slate-800 hover:bg-red-900 border border-slate-700 text-xs px-3 py-1.5 cursor-pointer">決定戦をやめる</button>}
+                            </div>
+                          )}
+                          {!RO && <div className="text-[10px] text-slate-400 mt-2">同時対戦で順位が付けば、その順に確定します。同率のまま残った人たちには、もう一度同時対戦を追加できます。</div>}
+                        </div>
+                      );
+                    });
+
       const showBgDeco = !(IS_DISPLAY && DISPLAY_BG !== 'theme');
       const customBg = showBgDeco && bg.type !== 'theme';
       const rootBgStyle = (() => {
@@ -2031,6 +2102,21 @@
             </div>
           )}
 
+          {/* 同順位決定戦パネル (トーナメント画面内で結果入力) */}
+          {!IS_DISPLAY && (!isPreviewMode || VIEWER) && !showRanking && tieGroups.length > 0 && (!RO || playoffs.length > 0) && (
+            <div className="absolute left-4 bottom-14 z-[2000] w-[min(46rem,92vw)]">
+              {showPlayoff && (
+                <div className="mb-2 max-h-[62vh] overflow-y-auto space-y-3 bg-slate-950/95 border-2 border-amber-500 p-3 shadow-2xl">
+                  {renderPlayoffCards()}
+                </div>
+              )}
+              <button onClick={() => setShowPlayoff(v => !v)}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black px-4 py-2 cursor-pointer shadow-lg">
+                ⚔ 同順位決定戦 ({tieGroups.length}組) {showPlayoff ? '▼ 閉じる' : '▲ 開く'}
+              </button>
+            </div>
+          )}
+
           {/* 順位表ページ (全画面オーバーレイ) */}
           {showRanking && (
             <div className="mc-overlay absolute inset-0 z-[3000] bg-slate-950 flex flex-col overflow-hidden">
@@ -2053,74 +2139,7 @@
                     <div className="text-center text-slate-500 py-12 text-lg font-bold">まだ参加者がいません</div>
                   ) : (<>
                     {podiumEntries.length > 0 && <Podium entries={podiumEntries} rules={rules} />}
-                    {tieGroups.map(group => {
-                      const ids = new Set(group.map(e => e.player.id));
-                      const ms = playoffs.filter(m => !m.ids && ids.has(m.a) && ids.has(m.b));
-                      const ffs = playoffs.filter(m => m.ids && m.ids.every(x => ids.has(x)));
-                      if (RO && ms.length === 0 && ffs.length === 0) return null;
-                      const nm = (id) => (pmap[id] || {}).name || '?';
-                      const need = group.length * (group.length - 1) / 2 - ms.length;
-                      // 決定戦の成績がまだ同じ選手のまとまり (同時対戦の対象)
-                      const open = Object.values(group.reduce((acc, e) => { (acc[e.poKey] = acc[e.poKey] || []).push(e.player.id); return acc; }, {})).filter(a => a.length >= 2);
-                      const openNow = open.filter(a => !ffs.some(f => f.order.length < f.ids.length && f.ids.length === a.length && f.ids.every(x => a.includes(x))));
-                      return (
-                        <div key={group.map(e => e.player.id).join('-')} className="po-card border-2 border-amber-500/60 bg-amber-950/20 p-4 rounded-2xl">
-                          <div className="font-black text-amber-300 text-lg">⚔ 同順位決定戦 <span className="text-sm text-amber-200/80 font-bold">{group.map(e => e.player.name).join(' / ')} (#{group[0].rank} タイ)</span></div>
-
-                          {ffs.map((f, fi) => (
-                            <div key={f.id} className="mt-3 border border-amber-500/40 p-3 bg-slate-950/40">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-xs font-black text-amber-200">🎮 同時対戦 {fi + 1} ({f.ids.length}人)</div>
-                                {!RO && <button onClick={() => playoffRemove(f.id)} className="text-[10px] text-slate-400 hover:text-red-400 cursor-pointer">✕ 削除</button>}
-                              </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {f.ids.map(id => {
-                                  const pos = f.order.indexOf(id);
-                                  return (
-                                    <button key={id} disabled={RO} onClick={() => playoffFfaToggle(f.id, id)}
-                                      className={`px-2 py-2 text-sm font-black border-2 ${RO ? '' : 'cursor-pointer'} ${pos >= 0 ? 'bg-emerald-700 border-emerald-300 text-white' : 'bg-slate-800 border-slate-600 hover:border-amber-400 text-white'}`}>
-                                      <div className="text-[11px] text-amber-200">{pos >= 0 ? `${pos + 1}位` : '未入力'}</div>
-                                      {nm(id)}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                              {!RO && <div className="text-[10px] text-slate-400 mt-2">上位の人から順に押して、同時対戦での順位を記録します(もう一度押すと取り消し)。残り1人は自動で最下位になります。</div>}
-                            </div>
-                          ))}
-
-                          {ms.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                              <div className="text-xs font-black text-amber-200">⚔ 1対1の決定戦</div>
-                              {ms.map(m => (
-                                <div key={m.id} className="flex items-center gap-2 text-white">
-                                  {['a', 'b'].map((side, i) => (
-                                    <React.Fragment key={side}>
-                                      {i === 1 && <span className="text-slate-500 text-xs font-black">VS</span>}
-                                      <button disabled={RO} onClick={() => playoffPick(m.id, side)}
-                                        className={`flex-1 px-3 py-2 text-sm font-black border-2 ${RO ? '' : 'cursor-pointer'} ${m.w === side ? 'bg-emerald-600 border-emerald-300 text-white' : m.w ? 'bg-slate-900/60 border-slate-700 text-slate-500 line-through' : 'bg-slate-800 border-slate-600 hover:border-amber-400'}`}>
-                                        {m.w === side ? '🏆 ' : ''}{nm(m[side])}
-                                      </button>
-                                    </React.Fragment>
-                                  ))}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {!RO && (
-                            <div className="mt-3 flex gap-2 flex-wrap">
-                              {openNow.map(a => (
-                                <button key={a.join(',')} onClick={() => playoffFfaCreate(a)} className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black px-3 py-1.5 cursor-pointer">🎮 {a.length}人で同時に対戦して順位を記録</button>
-                              ))}
-                              {need > 0 && <button onClick={() => playoffCreate(group)} className="bg-slate-800 hover:bg-slate-700 border border-amber-500/60 text-amber-200 text-xs font-black px-3 py-1.5 cursor-pointer">{ms.length ? '1対1: 不足分を追加' : '1対1の総当たりにする'}</button>}
-                              {(ms.length > 0 || ffs.length > 0) && <button onClick={() => playoffClear(group)} className="bg-slate-800 hover:bg-red-900 border border-slate-700 text-xs px-3 py-1.5 cursor-pointer">決定戦をやめる</button>}
-                            </div>
-                          )}
-                          {!RO && <div className="text-[10px] text-slate-400 mt-2">同時対戦で順位が付けば、その順に確定します。同率のまま残った人たちには、もう一度同時対戦を追加できます。</div>}
-                        </div>
-                      );
-                    })}
+                    {renderPlayoffCards()}
                     {listEntries.map((entry, idx) => {
                       const isFirst = entry.rank === 1;
                       const isSecond = entry.rank === 2;
