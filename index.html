@@ -785,6 +785,8 @@
       const setLinePart = (patch) => setLineStyle(prev => ({ ...prev, ...patch, mode: 'custom' }));
       const setBgPart = (patch) => setBg(prev => ({ ...prev, ...patch }));
       const [showPlayoff, setShowPlayoff] = useState(false);
+      const [rankOpen, setRankOpen] = useState({});
+      const [rankAll, setRankAll] = useState(false);
       const [synced, setSynced] = useState(!!saved);
       const [syncState, setSyncState] = useState(SERVER ? 'ok' : 'local');
       const lastRemoteChamp = useRef(saved?.championId ?? null);
@@ -2139,58 +2141,60 @@
                 </button>}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 md:p-12">
-                <div className="max-w-4xl mx-auto space-y-3 pb-20">
+              <div className="flex-1 overflow-y-auto p-4 md:p-8">
+                <div className="max-w-5xl mx-auto space-y-3 pb-12">
                   {computeRankings.length === 0 ? (
                     <div className="text-center text-slate-500 py-12 text-lg font-bold">まだ参加者がいません</div>
                   ) : (<>
                     {podiumEntries.length > 0 && <Podium entries={podiumEntries} rules={rules} />}
-                    {renderPlayoffCards()}
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 -mb-1">
+                      <span>順位 ・ {rules.showScore ? rules.scoreLabel : '成績'}　(行を押すと詳細)</span>
+                      <button onClick={() => { setRankAll(v => !v); setRankOpen({}); }} className="underline cursor-pointer hover:text-white">{rankAll ? '詳細をすべて閉じる' : '詳細をすべて開く'}</button>
+                    </div>
+                    <div className={`grid gap-2 ${listEntries.length > 10 ? 'md:grid-cols-2' : ''}`}>
                     {listEntries.map((entry, idx) => {
                       const isFirst = entry.rank === 1;
                       const isSecond = entry.rank === 2;
                       const isThird = entry.rank === 3;
-                      const rankColor = isFirst ? 'text-yellow-400' : isSecond ? 'text-slate-300' : isThird ? 'text-amber-600' : 'text-slate-500';
+                      const rankColor = isFirst ? 'text-yellow-400' : isSecond ? 'text-slate-300' : isThird ? 'text-amber-600' : 'text-slate-400';
+                      const id = entry.player.id;
+                      const open = rankAll !== !!rankOpen[id];
                       return (
-                        <div
-                          key={entry.player.id}
-                          className={`flex items-center justify-between p-4 sm:p-5 rounded-2xl border transition-all hover:scale-[1.01] ${
-                            isFirst
-                              ? 'bg-yellow-950/20 border-yellow-900/50 shadow-[0_0_20px_rgba(250,204,21,0.15)]'
-                              : isSecond
-                                ? 'bg-slate-800/30 border-slate-700/50'
-                                : isThird
-                                  ? 'bg-amber-950/10 border-amber-900/30'
-                                  : idx % 2 === 0 ? 'bg-slate-900/40 border-slate-800/50' : 'bg-transparent border-transparent'
-                          }`}
-                        >
-                          <div className="flex items-center gap-4 sm:gap-6">
-                            <div className={`w-14 text-center font-black text-3xl sm:text-4xl ${rankColor}`}>#{entry.rank}</div>
-                            <div className="flex items-center gap-4 sm:gap-6">
-                              <PlayerIcon flag={entry.player.flag} size={56} />
-                              <div>
-                                <div className={`font-black text-2xl sm:text-3xl ${isFirst ? 'text-yellow-400' : 'text-white'}`}>{entry.player.name}</div>
-                                <div className={`text-xs sm:text-sm font-bold mt-1 ${entry.isAlive ? 'text-emerald-400' : 'text-slate-500'}`}>
-                                  {entry.isAlive ? '✨ トーナメント参戦中' : `💀 敗退 (${roundName(entry.wonRounds + 1, numRounds)})`}
-                                  {entry.poWins > 0 && <span className="ml-2 text-amber-300">⚔ 決定戦で順位確定</span>}
-                                  {(entry.isRepChamp || entry.repWins > 0) && (
-                                    <span className="ml-2 text-amber-300">🔄 復活戦{entry.isRepChamp ? ' 優勝' : ` ${entry.repWins}勝`}</span>
-                                  )}
-                                </div>
-                              </div>
+                        <div key={id}
+                          onClick={() => setRankOpen(prev => ({ ...prev, [id]: !prev[id] }))}
+                          className={`rank-row cursor-pointer px-3 py-2 border transition ${
+                            isFirst ? 'bg-yellow-950/25 border-yellow-700/60'
+                              : isSecond ? 'bg-slate-800/40 border-slate-600/50'
+                              : isThird ? 'bg-amber-950/15 border-amber-800/40'
+                              : 'bg-slate-900/50 border-slate-800/60 hover:border-slate-600'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 text-center font-black text-2xl ${rankColor}`}>#{entry.rank}</div>
+                            <PlayerIcon flag={entry.player.flag} size={36} />
+                            <div className="flex-1 min-w-0">
+                              <div className={`font-black text-lg truncate ${isFirst ? 'text-yellow-300' : 'text-white'}`}>{entry.player.name}</div>
                             </div>
+                            {rules.showScore && (
+                              <div className={`text-2xl font-black tabular-nums ${entry.totalDamage !== 0 ? 'text-rose-400' : 'text-slate-600'}`}>{entry.totalDamage.toLocaleString()}</div>
+                            )}
+                            <span className="text-slate-500 text-xs w-3">{open ? '▲' : '▼'}</span>
                           </div>
-                          {rules.showScore && (
-                            <div className="text-right">
-                              <div className="text-[10px] sm:text-xs text-slate-500 font-bold mb-1 tracking-widest uppercase">{rules.scoreLabel}</div>
-                              <div className={`text-3xl sm:text-4xl font-black ${entry.totalDamage !== 0 ? 'text-rose-500' : 'text-slate-700'} drop-shadow-lg`}>
-                                {entry.totalDamage.toLocaleString()}
+                          {open && (
+                            <div className="mt-2 ml-14 pl-3 border-l-2 border-slate-700 text-xs space-y-1">
+                              <div className={`font-bold ${entry.isAlive ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                {entry.isAlive ? '✨ トーナメント参戦中' : `💀 敗退 (${roundName(entry.wonRounds + 1, numRounds)})`}
                               </div>
+                              <div className="text-slate-300">勝利数: {entry.wonRounds}勝{rules.showScore && ` ×${rules.pointsPerWin.toLocaleString()}`}
+                                {rules.hpMode !== 'ignore' && !entry.isAlive && <span> ／ {rules.hpLabel}: {entry.hp.toLocaleString()} ({rules.hpMode === 'add' ? '加算' : '減算'})</span>}
+                              </div>
+                              {(entry.isRepChamp || entry.repWins > 0) && <div className="text-amber-300">🔄 敗者復活戦{entry.isRepChamp ? ' 優勝' : ` ${entry.repWins}勝`}</div>}
+                              {entry.poWins > 0 && <div className="text-amber-300">⚔ 同順位決定戦で順位確定</div>}
                             </div>
                           )}
                         </div>
                       );
                     })}
+                    </div>
+                    {renderPlayoffCards()}
                   </>)}
                 </div>
               </div>
