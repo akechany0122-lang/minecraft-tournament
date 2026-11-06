@@ -1,0 +1,2641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GEO GUESSR RPG杯 - Geoguessr Web Bracket</title>
+  <!-- Google Fonts: Outfit, Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Inter:wght@400;500;700&family=DotGothic16&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            outfit: ['Outfit', 'sans-serif'],
+            sans: ['Inter', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="styles.css">
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  
+  <!-- React & ReactDOM UMD (Global) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel Standalone for JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="space-bg text-white h-screen w-screen overflow-hidden font-sans select-none">
+  <div id="root" class="w-full h-full"></div>
+
+  <!-- JSX script, compiled by Babel on the client -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // ジオゲッサーの有名プレイヤー初期モックデータ
+    const DEFAULT_PLAYERS = [
+      { id: 'p1', name: 'Rainbolt', flag: '🇺🇸' },
+      { id: 'p2', name: 'Blinky', flag: '🇫🇷' },
+      { id: 'p3', name: 'Consus', flag: '🇳🇱' },
+      { id: 'p4', name: 'Kodiak', flag: '🇩🇪' },
+      { id: 'p5', name: 'Radu', flag: '🇷🇴' },
+      { id: 'p6', name: 'Shiina', flag: '🇯🇵' },
+      { id: 'p7', name: 'Barry', flag: '🇦🇺' },
+      { id: 'p8', name: 'Maccem', flag: '🇸🇪' },
+      { id: 'p9', name: 'Topotic', flag: '🇪🇸' },
+      { id: 'p10', name: 'Havard', flag: '🇳🇴' },
+      { id: 'p11', name: 'Lazy', flag: '🇨🇦' },
+      { id: 'p12', name: 'Debal', flag: '🇫🇷' },
+      { id: 'p13', name: 'Haru', flag: '🇯🇵' },
+      { id: 'p14', name: 'Jupiland', flag: '🇮🇹' },
+      { id: 'p15', name: 'Gibbs', flag: '🇳🇿' },
+      { id: 'p16', name: 'Toro', flag: '🇯🇵' },
+    ];
+
+    // マイクラ風アバター (mc/avatars/*.svg)
+    const MC_AVATARS = ['steve', 'alex', 'creeper', 'zombie', 'skeleton', 'enderman', 'pig', 'villager', 'blaze', 'slime', 'cow', 'chicken']
+      .map(n => ({ flag: `mc/avatars/${n}.svg`, name: `MC ${n[0].toUpperCase() + n.slice(1)}` }));
+
+    // 主要国の国旗リスト (セレクトボックス用)
+    const COUNTRY_FLAGS = [
+      { flag: 'icon/1.png', name: 'アイコン1' },
+      { flag: 'icon/2.png', name: 'アイコン2' },
+      { flag: 'icon/3.png', name: 'アイコン3' },
+      { flag: 'icon/4.png', name: 'アイコン4' },
+      { flag: 'icon/5.png', name: 'アイコン5' },
+      { flag: 'icon/6.png', name: 'アイコン6' },
+      { flag: 'icon/7.png', name: 'アイコン7' },
+      { flag: 'icon/8.png', name: 'アイコン8' },
+      { flag: 'icon/9.png', name: 'アイコン9' },
+      { flag: 'icon/10.png', name: 'アイコン10' },
+      { flag: 'icon/11.png', name: 'アイコン11' },
+      ...MC_AVATARS,
+      { flag: '🇯🇵', name: '日本' },
+      { flag: '🇺🇸', name: 'アメリカ' },
+      { flag: '🇫🇷', name: 'フランス' },
+      { flag: '🇳🇱', name: 'オランダ' },
+      { flag: '🇩🇪', name: 'ドイツ' },
+      { flag: '🇬🇧', name: 'イギリス' },
+      { flag: '🇦🇺', name: '豪州' },
+      { flag: '🇸🇪', name: 'スウェーデン' },
+      { flag: '🇨🇦', name: 'カナダ' },
+      { flag: '🇳🇿', name: 'NZ' },
+      { flag: '🇷🇴', name: 'ルーマニア' },
+      { flag: '🇪🇸', name: 'スペイン' },
+      { flag: '🇳🇴', name: 'ノルウェー' },
+      { flag: '🇮🇹', name: 'イタリア' },
+      { flag: '🇧🇷', name: 'ブラジル' },
+      { flag: '🇰🇷', name: '韓国' },
+      { flag: '🇹🇼', name: '台湾' },
+      { flag: '🇫🇮', name: 'フィンランド' },
+      { flag: '🇨🇭', name: 'スイス' },
+      { flag: '🇦🇹', name: 'オーストリア' },
+      { flag: '🇧🇪', name: 'ベルギー' },
+      { flag: '🇩🇰', name: 'デンマーク' },
+      { flag: '🇵🇹', name: 'ポルトガル' },
+      { flag: '🇵🇱', name: 'ポーランド' },
+      { flag: '🇿🇦', name: '南アフリカ' },
+      { flag: '🇸🇬', name: 'シンガポール' },
+      { flag: '🇹🇭', name: 'タイ' },
+      { flag: '🇵🇭', name: 'フィリピン' },
+      { flag: '🇮🇳', name: 'インド' },
+      { flag: '🇲🇽', name: 'メキシコ' },
+      { flag: '🇦🇷', name: 'アルゼンチン' },
+      { flag: '🇺🇦', name: 'ウクライナ' },
+    ];
+
+    const isImg = (f) => f && (f.endsWith('.png') || f.endsWith('.svg') || f.startsWith('data:image'));
+
+
+    // インライン SVG アイコン
+    const SettingsIcon = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    );
+
+    const PreviewIcon = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    );
+
+    const RotateCcwIcon = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+      </svg>
+    );
+
+    const ShuffleIcon = ({ className }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/>
+        <path d="m18 2 4 4-4 4"/>
+        <path d="M2 6h1.9c1.2 0 2.3.6 3 1.7l1.1 1.6"/>
+        <path d="m15.4 12.8 1.2 1.7c.8 1.1 2 1.7 3.2 1.7H22"/>
+        <path d="m18 14 4 4-4 4"/>
+      </svg>
+    );
+
+    // 星空背景 (背景画像に星があるため、極小数を重ねてまたたかせる)
+    function StarBackground() {
+      const stars = useMemo(() => {
+        const temp = [];
+        for (let i = 0; i < 20; i++) {
+          temp.push({
+            id: i,
+            x: Math.random() * 100,
+            y: Math.random() * 100,
+            size: Math.random() * 2 + 1,
+            delay: Math.random() * 5
+          });
+        }
+        return temp;
+      }, []);
+
+      return (
+        <div className="absolute inset-0 pointer-events-none z-0">
+          {stars.map((star) => (
+            <div
+              key={star.id}
+              className="star"
+              style={{
+                left: `${star.x}%`,
+                top: `${star.y}%`,
+                width: `${star.size}px`,
+                height: `${star.size}px`,
+                animation: `twinkle 3s infinite ease-in-out`,
+                animationDelay: `${star.delay}s`
+              }}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    const INPUT_CLS = 'w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-rose-500';
+    function Field({ label, children }) {
+      return (
+        <div>
+          <label className="block text-xs font-bold text-slate-400 mb-1.5 tracking-wide">{label}</label>
+          {children}
+        </div>
+      );
+    }
+    function Section({ title, children }) {
+      return (
+        <div className="border border-slate-800 p-3 space-y-3">
+          <h4 className="text-sm font-black text-rose-400">{title}</h4>
+          {children}
+        </div>
+      );
+    }
+
+    // =====================================================================
+    //  ★ ゲーム追加ガイド
+    //   1. THEMES に背景テーマを追加 (見た目を変えたい場合。CSSは styles.css に .xxx-theme を追加)
+    //   2. GAME_PRESETS にゲーム用プリセットを追加 (タイトル/テーマ/得点ルール/ラベル/初期選手)
+    //   ※ 設定パネルの「プリセット」→「現在の設定を保存」でも、コード不要で自分用プリセットを作れます
+    // =====================================================================
+    const THEMES = {
+      earth:     { label: '地球 (Earth & Stars)',  rootClass: 'space-bg' },
+      minecraft: { label: 'マインクラフト (Minecraft)', rootClass: 'mc-theme' },
+      dark:      { label: 'ダーク (シンプル黒)',     rootClass: 'bg-slate-950' },
+      blue:      { label: 'ブルーグラデーション',    rootClass: 'bg-gradient-to-br from-blue-950 to-slate-900' },
+    };
+
+    const DEFAULT_RULES = {
+      pointsPerWin: 6000,     // 1勝あたりの得点
+      hpMode: 'add',          // 敗退者の入力値(HP等): add=加算 / subtract=減算 / ignore=使わない
+      rankOrder: 'desc',      // desc=数値が大きいほど上位 / asc=小さいほど上位
+      tiebreak: 'score',      // 同成績の決め方: score=数値で決める / share=同順位 / seed=シード順
+      scoreLabel: '総与ダメージ',
+      hpLabel: '残りHP',
+      rankView: 'list',       // list=リスト / podium=表彰台+リスト
+      rankTopN: 0,            // 0=全員表示 / n=上位n位まで
+      showScore: true,
+      repechage: { enabled: false, from: 1, to: 1 },   // 敗者復活戦: 対象は「fromラウンド〜toラウンド」の敗退者
+    };
+
+    const GAME_PRESETS = {
+      geoguessr: {
+        name: 'ジオゲッサー', theme: 'earth',
+        title: 'GEO GUESSR RPG杯', subtitle: 'Geoguessr Tournament Bracket',
+        rules: { pointsPerWin: 6000, hpMode: 'add', scoreLabel: '総与ダメージ', hpLabel: '残りHP' },
+        players: DEFAULT_PLAYERS.map(p => ({ name: p.name, flag: p.flag })),
+      },
+      godfield: {
+        name: 'ゴッドフィールド', theme: 'earth',
+        title: 'GOD FIELD 杯', subtitle: 'God Field Tournament Bracket',
+        rules: { pointsPerWin: 100, hpMode: 'subtract', scoreLabel: '最終スコア', hpLabel: '残り数値' },
+      },
+      minecraft: {
+        name: 'マインクラフト', theme: 'minecraft',
+        title: 'MINECRAFT 大会', subtitle: 'Minecraft Tournament Bracket',
+        rules: { pointsPerWin: 20, hpMode: 'add', scoreLabel: 'スコア', hpLabel: '残りハート', rankView: 'podium' },
+        players: [
+          ...['Steve', 'Alex', 'Creeper', 'Zombie', 'Skeleton', 'Enderman', 'Pig', 'Villager', 'Blaze', 'Slime', 'Cow', 'Chicken']
+            .map(n => ({ name: n, flag: `mc/avatars/${n.toLowerCase()}.svg` })),
+          { name: 'Sword', flag: '🗡️' }, { name: 'Pickaxe', flag: '⛏️' }, { name: 'Diamond', flag: '💎' }, { name: 'Archer', flag: '🏹' },
+        ],
+      },
+      generic: {
+        name: '汎用 (その他のゲーム)', theme: 'dark',
+        title: 'TOURNAMENT', subtitle: 'Tournament Bracket',
+        rules: { pointsPerWin: 1, hpMode: 'ignore', scoreLabel: '勝利数', hpLabel: 'スコア', tiebreak: 'share' },
+      },
+    };
+
+    const mergeRules = (r) => ({ ...DEFAULT_RULES, ...(r || {}), repechage: { ...DEFAULT_RULES.repechage, ...((r && r.repechage) || {}) } });
+
+    // ラウンド名 (r1: 1始まり)
+    const roundName = (r1, total) => {
+      if (r1 >= total) return '決勝';
+      if (r1 === total - 1) return '準決勝';
+      if (r1 === total - 2) return '準々決勝';
+      return `${r1}回戦`;
+    };
+
+    // ---- 保存 (localStorage) ----
+    const STORAGE_KEY = 'bracket-maker:v2';
+    const PRESET_KEY = 'bracket-maker:user-presets';
+    const LIVE_KEY = 'bracket-maker:live';
+    // ---- 配信専用画面: ?display=1 (&bg=transparent|green) (&title=1) ----
+    const URLP = new URLSearchParams(location.search);
+    const IS_DISPLAY = URLP.get('display') === '1';
+    // ---- 同期サーバー (server.js) 連携: 管理者(ADMIN)だけが編集でき、他の人(VIEWER)は閲覧専用 ----
+    const TOKEN_KEY = 'bracket-maker:token';
+    let SERVER = false, ADMIN = false, VIEWER = false, RO = IS_DISPLAY, TOKEN = '', REMOTE = null;
+    const authHeaders = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN });
+    const normBg = (d) => {
+      const def = { type: 'theme', image: '', color: '#1e293b', fit: 'cover', dim: 35 };
+      if (d && d.bg && typeof d.bg === 'object') return { ...def, ...d.bg };
+      if (d && d.bgTheme === 'custom') return { ...def, type: d.customBgUrl ? 'image' : 'theme', image: d.customBgUrl || '' };
+      return def;
+    };
+    const adminLogin = async () => {
+      const pw = window.prompt('管理者パスワードを入力してください');
+      if (!pw) return;
+      try {
+        const r = await fetch('api/login', { method: 'POST', headers: { Authorization: 'Bearer ' + pw } });
+        if (r.ok) { try { localStorage.setItem(TOKEN_KEY, pw); } catch (e) {} location.reload(); }
+        else window.alert(r.status === 429 ? '試行回数が多すぎます。1分ほど待ってください。' : 'パスワードが違います。');
+      } catch (e) { window.alert('サーバーに接続できませんでした。'); }
+    };
+    const fileToBgData = (file, cb) => {
+      const r = new FileReader();
+      r.onload = (ev) => {
+        if (/svg/.test(file.type)) { cb(ev.target.result); return; }
+        const img = new Image();
+        img.onload = () => {
+          const sc = Math.min(1, 1920 / Math.max(img.width, img.height));
+          const c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.width * sc)); c.height = Math.max(1, Math.round(img.height * sc));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          cb(c.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => window.alert('画像を読み込めませんでした。');
+        img.src = ev.target.result;
+      };
+      r.readAsDataURL(file);
+    };
+    const DISPLAY_BG = ['transparent', 'green'].includes(URLP.get('bg')) ? URLP.get('bg') : 'theme';
+    const DISPLAY_TITLE = URLP.get('title') === '1';
+    const initLive = () => (SERVER ? (REMOTE && REMOTE.live) : loadJSON(LIVE_KEY)) || {};
+    const loadJSON = (key) => { try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } catch (e) { return null; } };
+    const saveJSON = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; } };
+
+    // ---- 敗者復活戦: エントリー順 → 全ラウンドの対戦を導出 (picks: {'r-m': 'a'|'b'}) ----
+    function deriveRep(entrants, picks) {
+      if (!entrants || entrants.length < 2) return { rounds: [], champion: null, wins: {} };
+      const size = Math.pow(2, Math.ceil(Math.log2(entrants.length)));
+      const order = getSeedOrder(size);
+      let cur = order.map(s => (s < entrants.length ? entrants[s] : 'bye'));
+      const rounds = [];
+      const wins = {};
+      let r = 0;
+      while (cur.length > 1) {
+        const ms = [];
+        const next = [];
+        for (let m = 0; m < cur.length / 2; m++) {
+          const a = cur[m * 2], b = cur[m * 2 + 1];
+          let w = null, auto = false;
+          if (a === 'bye' && b === 'bye') { w = 'bye'; auto = true; }
+          else if (a === 'bye') { w = b; auto = true; }
+          else if (b === 'bye') { w = a; auto = true; }
+          else {
+            const pk = picks[`${r}-${m}`];
+            if (pk === 'a' && a) w = a; else if (pk === 'b' && b) w = b;
+            if (w) wins[w] = (wins[w] || 0) + 1;
+          }
+          ms.push({ a, b, w, auto });
+          next.push(w);
+        }
+        rounds.push(ms);
+        cur = next;
+        r++;
+      }
+      const last = rounds[rounds.length - 1][0];
+      return { rounds, champion: last.w && last.w !== 'bye' ? last.w : null, wins };
+    }
+
+    const PlayerIcon = ({ flag, size = 28 }) => (
+      isImg(flag)
+        ? <img src={flag} style={{ width: size, height: size, imageRendering: 'pixelated' }} className="object-cover bg-slate-800 shrink-0 rounded-full" alt="icon" />
+        : <span style={{ fontSize: size * 0.85, lineHeight: 1 }} className="shrink-0">{flag || '📍'}</span>
+    );
+
+    // ---- 敗者復活戦ボード ----
+    function RepBoard({ rep, derived, pmap, eligibleIds, stale, rules, totalRounds, onGenerate, onPick, onUndo }) {
+      const from = rules.repechage.from, to = rules.repechage.to;
+      const scopeText = from === to ? `${roundName(from, totalRounds)}敗退者` : `${roundName(from, totalRounds)}〜${roundName(to, totalRounds)}の敗退者`;
+      const nm = (id) => pmap[id];
+      const rows = (m, mi, ri) => ['a', 'b'].map(side => {
+        const id = m[side];
+        const isW = m.w && m.w === id;
+        const canPick = m.a && m.b && m.a !== 'bye' && m.b !== 'bye' && !m.w;
+        return (
+          <div key={side} className={`flex items-center gap-2 px-2 py-1.5 border ${isW ? 'bg-emerald-900/60 border-emerald-500' : 'bg-slate-900/80 border-slate-700'} ${m.w && !isW && m.w !== 'bye' ? 'opacity-50' : ''}`}>
+            {id === 'bye' ? <span className="text-slate-500 text-xs font-bold w-full text-center">BYE (不戦勝)</span>
+              : id ? (<>
+                <PlayerIcon flag={nm(id)?.flag} size={24} />
+                <span className={`text-sm font-bold truncate flex-1 ${isW ? 'text-emerald-300' : 'text-white'}`}>{nm(id)?.name}</span>
+                {canPick && !RO && <button onClick={() => onPick(ri, mi, side)} className="bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded cursor-pointer">WIN</button>}
+                {isW && <span className="text-emerald-400 text-xs">✔</span>}
+              </>)
+              : <span className="text-slate-600 text-xs w-full text-center">---</span>}
+          </div>
+        );
+      });
+
+      return (
+        <div className="relative z-10 flex-1 overflow-auto p-6 md:p-10">
+          <div className="max-w-6xl mx-auto bg-slate-950/85 border-2 border-slate-700 p-6">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              <h2 className="text-2xl font-black font-outfit text-white">🔄 敗者復活戦</h2>
+              <span className="text-xs text-slate-300 bg-slate-900/80 border border-slate-700 px-3 py-1 rounded">対象: {scopeText} / 現在 {eligibleIds.length} 名</span>
+              {!RO && <button onClick={onGenerate} disabled={eligibleIds.length < 2}
+                className="ml-auto bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-black px-4 py-2 rounded-lg cursor-pointer">
+                {rep ? '対戦表を作り直す' : '対戦表を作成'}
+              </button>}
+            </div>
+            {stale && rep && !RO && (
+              <div className="mb-4 text-xs text-amber-300 bg-amber-950/70 border border-amber-700 px-3 py-2">
+                本戦の結果が変わり、対象者が現在の対戦表と一致しません。「対戦表を作り直す」で更新できます (復活戦の勝敗はリセットされます)。
+              </div>
+            )}
+            {!rep && (
+              <div className="text-slate-300 text-sm bg-slate-900/70 border border-slate-700 p-6">
+                {eligibleIds.length < 2
+                  ? `対象者(${scopeText})が2名以上になると、ここに対戦表を作成できます。本戦を進めてください。`
+                  : `対象者が ${eligibleIds.length} 名そろいました。「対戦表を作成」を押すと復活戦のトーナメントが作られます。`}
+              </div>
+            )}
+            {rep && (
+              <div className="flex gap-6 items-stretch overflow-x-auto pb-4" style={{ minHeight: Math.max(240, derived.rounds[0].length * 130) }}>
+                {derived.rounds.map((round, ri) => (
+                  <div key={ri} className="flex flex-col min-w-[230px]">
+                    <div className="text-center text-xs font-black text-slate-300 mb-2 tracking-widest">
+                      {ri === derived.rounds.length - 1 ? '復活戦 決勝' : `復活戦 ${ri + 1}回戦`}
+                    </div>
+                    <div className="flex flex-col justify-around flex-1 gap-3">
+                      {round.map((m, mi) => (
+                        <div key={mi} className="border-2 border-slate-600 bg-slate-950/80 p-1.5 space-y-1">
+                          {rows(m, mi, ri)}
+                          {m.w && !m.auto && !RO && (
+                            <button onClick={() => onUndo(ri, mi)} className="text-[10px] text-slate-400 hover:text-white w-full text-right cursor-pointer">↺ やり直し</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div className="flex flex-col justify-center min-w-[200px]">
+                  <div className="text-center text-xs font-black text-yellow-300 mb-2 tracking-widest">復活</div>
+                  <div className={`border-2 p-4 text-center ${derived.champion ? 'border-yellow-400 bg-yellow-950/50' : 'border-slate-700 bg-slate-900/60'}`}>
+                    {derived.champion ? (<>
+                      <div className="text-4xl mb-1">🔄</div>
+                      <div className="flex justify-center mb-1"><PlayerIcon flag={nm(derived.champion)?.flag} size={44} /></div>
+                      <div className="font-black text-lg text-yellow-300">{nm(derived.champion)?.name}</div>
+                      <div className="text-[10px] text-slate-300 mt-1">復活戦 優勝 (順位に反映)</div>
+                    </>) : <span className="text-slate-500 text-sm">未決定</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400 mt-6">※ 復活戦の勝ち数は順位表に反映されます (本戦で同じラウンドに敗退した選手の中で、復活戦の成績が上位になります)。</p>
+          </div>
+        </div>
+      );
+    }
+
+    // ---- 表彰台 ----
+    function Podium({ entries, rules }) {
+      const slots = [entries[1], entries[0], entries[2]];
+      const cfg = [
+        { h: 'h-24', color: 'text-slate-200', bg: 'bg-slate-500', n: 2 },
+        { h: 'h-36', color: 'text-yellow-300', bg: 'bg-yellow-500', n: 1 },
+        { h: 'h-16', color: 'text-amber-500', bg: 'bg-amber-700', n: 3 },
+      ];
+      return (
+        <div className="flex items-end justify-center gap-3 sm:gap-6 mb-10 pt-4">
+          {slots.map((e, i) => e && (
+            <div key={e.player.id} className="flex flex-col items-center w-28 sm:w-40">
+              <PlayerIcon flag={e.player.flag} size={i === 1 ? 72 : 56} />
+              <div className={`mt-2 font-black text-base sm:text-xl text-center truncate w-full ${cfg[i].color}`}>{e.player.name}</div>
+              {rules.showScore && <div className="text-xs text-slate-300 mb-1">{e.totalDamage.toLocaleString()}</div>}
+              <div className={`${cfg[i].h} ${cfg[i].bg} w-full flex items-start justify-center pt-2 border-2 border-black/60 shadow-lg`}>
+                <span className="text-3xl font-black text-white drop-shadow">{e.rank}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // ===== マインクラフト風 背景 =====
+    // ピクセルアート用ヘルパー: 文字グリッド → <rect> 群
+    function PixelArt({ rows, palette, size, className }) {
+      const rects = [];
+      rows.forEach((row, y) => {
+        [...row].forEach((ch, x) => {
+          if (palette[ch]) rects.push(<rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill={palette[ch]} />);
+        });
+      });
+      return (
+        <svg className={className} viewBox={`0 0 ${rows[0].length} ${rows.length}`} width={rows[0].length * size} height={rows.length * size} shapeRendering="crispEdges">
+          {rects}
+        </svg>
+      );
+    }
+
+    const TREE_ROWS = [
+      '...LLLLLL...',
+      '..LLlLLLLL..',
+      '.LLLLLLlLLL.',
+      '.LlLLLLLLLL.',
+      '.LLLLlLLLLL.',
+      '..LLLLLLlL..',
+      '...LLLLLL...',
+      '.....TT.....',
+      '.....TT.....',
+      '.....Tt.....',
+      '.....TT.....',
+      '.....TT.....',
+    ];
+    const TREE_PAL = { L: '#3f8f2b', l: '#2f7320', T: '#6b4a2a', t: '#563b20' };
+
+    const CREEPER_ROWS = [
+      '..GGGGGG..',
+      '..GgGGgG..',
+      '..KKGGKK..',
+      '..KKGGKK..',
+      '..GGKKGG..',
+      '..GKKKKG..',
+      '..GKGGKG..',
+      '...GGGG...',
+      '...GggG...',
+      '...GGGG...',
+      '...GGGG...',
+      '..GGGGGG..',
+      '..GgGGgG..',
+      '..GG..GG..',
+    ];
+    const CREEPER_PAL = { G: '#4fc13a', g: '#3a9a2a', K: '#101010' };
+
+    const GRASS_BLOCK_ROWS = [
+      'GGGGGGGGGGGG',
+      'GgGGGGgGGGGG',
+      'GGGgGGGGGgGG',
+      'GDGGGDGGGDGG',
+      'DDDDDDDDDDDD',
+      'DdDDDDdDDDdD',
+      'DDDdDDDDdDDD',
+      'DDDDDdDDDDDD',
+      'DdDDDDDDdDDD',
+      'DDDDdDDDDDdD',
+      'DDdDDDDdDDDD',
+      'DDDDDDDDDdDD',
+    ];
+    const GRASS_BLOCK_PAL = { G: '#5fa83a', g: '#4f9230', D: '#866043', d: '#6b4a2f' };
+
+    function MinecraftBackground() {
+      const clouds = useMemo(() => [
+        { top: '8%',  dur: 90,  delay: -20, scale: 1.0 },
+        { top: '20%', dur: 130, delay: -80, scale: 0.7 },
+        { top: '14%', dur: 110, delay: -50, scale: 1.3 },
+        { top: '30%', dur: 160, delay: -120, scale: 0.8 },
+      ], []);
+      return (
+        <div className="mc-world">
+          <div className="mc-sun" />
+          <div className="mc-hills mc-hills-far" />
+          <div className="mc-hills mc-hills-near" />
+          {clouds.map((c, i) => (
+            <div key={i} className="mc-cloud" style={{ top: c.top, animationDuration: `${c.dur}s`, animationDelay: `${c.delay}s`, transform: `scale(${c.scale})` }} />
+          ))}
+          <PixelArt rows={TREE_ROWS} palette={TREE_PAL} size={14} className="mc-deco mc-tree-l" />
+          <PixelArt rows={TREE_ROWS} palette={TREE_PAL} size={11} className="mc-deco mc-tree-r" />
+          <PixelArt rows={CREEPER_ROWS} palette={CREEPER_PAL} size={7} className="mc-deco mc-creeper" />
+          <div className="mc-ground" />
+        </div>
+      );
+    }
+
+    // 巨大地球 (背景画像に移管したため非表示)
+    function Earth() {
+      return null;
+    }
+
+    // 地図 of ピン (32px〜72px アバターピン＋下部に名前を常に表示)
+    function MapPin({ player, isEditable, onPlayerUpdate, isGold, uiConfig, isPreviewMode }) {
+      const [editing, setEditing] = useState(false);
+      const [tempName, setTempName] = useState(player?.name || '');
+      const [tempFlag, setTempFlag] = useState(player?.flag || '📍');
+      const inputRef = useRef(null);
+
+      useEffect(() => {
+        if (player) {
+          setTempName(player.name);
+          setTempFlag(player.flag);
+        }
+      }, [player]);
+
+      useEffect(() => {
+        if (editing && inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, [editing]);
+
+      const handleDoubleClick = (e) => {
+        e.stopPropagation();
+        if (isEditable && !player.isLoser && !isPreviewMode) {
+          setEditing(true);
+        }
+      };
+
+      const handleBlur = () => {
+        setEditing(false);
+        const nameVal = tempName.trim();
+        const flagVal = tempFlag;
+
+        onPlayerUpdate(player.id, nameVal, flagVal);
+      };
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+          handleBlur();
+        }
+      };
+
+      const pinColorClass = isGold
+        ? 'border-yellow-400 bg-yellow-400 text-yellow-950 winner-glow'
+        : player.isWinner
+          ? 'border-emerald-500 bg-emerald-500 text-white'
+          : player.isLoser
+            ? 'border-slate-600/60 bg-slate-700/60 text-slate-400/80 grayscale scale-90'
+            : player.position.slot === 1
+              ? 'border-rose-500 bg-rose-500 text-white'
+              : 'border-blue-500 bg-blue-500 text-white';
+
+      return (
+        <div
+          className={`relative group flex flex-col items-center select-none ${player.isLoser ? '' : 'cursor-pointer'}`}
+          onDoubleClick={handleDoubleClick}
+        >
+          {/* ホバーツールチップ / 編集用吹き出し */}
+          {!player.isBye && (
+            <div
+              className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 bg-slate-950/95 border border-slate-700/80 px-2.5 py-1.5 rounded-xl text-xs text-white whitespace-nowrap shadow-2xl flex items-center gap-1.5 z-50 transition-all duration-200 pointer-events-auto ${
+                editing 
+                  ? 'opacity-100 translate-y-0 scale-100' 
+                  : 'opacity-0 translate-y-1.5 scale-95 group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 pointer-events-none'
+              }`}
+            >
+              {editing ? (
+              <div className="flex gap-1.5 items-center">
+                {/* 主要国旗選択ドロップダウン */}
+                <div className="flex gap-1 items-center">
+                  <select
+                    value={isImg(tempFlag) && !COUNTRY_FLAGS.some(c => c.flag === tempFlag) ? 'custom' : tempFlag}
+                    onChange={(e) => setTempFlag(e.target.value)}
+                    className="bg-slate-900 text-white rounded border border-rose-500 text-xs font-bold focus:outline-none py-0.5 px-1 cursor-pointer w-20"
+                  >
+                    {COUNTRY_FLAGS.map(c => (
+                      <option key={c.flag} value={c.flag}>
+                        {isImg(c.flag) ? `🖼️ ${c.name}` : `${c.flag} ${c.name}`}
+                      </option>
+                    ))}
+                    <option value="custom" disabled>📁 個別画像</option>
+                  </select>
+                  <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-white rounded px-2 py-0.5 text-xs border border-slate-700 flex items-center justify-center">
+                    📁
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            setTempFlag(ev.target.result);
+                            onPlayerUpdate(player.id, tempName.trim(), ev.target.result);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  onBlur={handleBlur}
+                  onKeyDown={handleKeyDown}
+                  className="bg-slate-900 text-white px-2 py-0.5 rounded border border-rose-500 text-xs font-bold focus:outline-none w-20 text-center"
+                  maxLength={12}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 font-bold">
+                {isImg(player.flag) ? (
+                  <img src={player.flag} className="w-5 h-5 object-cover rounded-full bg-slate-800" alt="icon" />
+                ) : (
+                  <span>{player.flag}</span>
+                )}
+                <span>{player.name}</span>
+              </div>
+            )}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-950"></div>
+          </div>
+          )}
+
+          {/* ピンの頭部 (動的サイズスケーリング) */}
+          <div 
+            className={`pin-head rounded-full flex items-center justify-center shadow-lg transition-all duration-300 ${player.isBye ? 'border-slate-700 bg-slate-800 text-slate-500' : pinColorClass} ${uiConfig.pinClass} overflow-hidden`}
+            style={{ width: `${uiConfig.pinSize}px`, height: `${uiConfig.pinSize}px` }}
+          >
+            {isImg(player.flag) ? (
+              <img src={player.flag} className="w-full h-full object-cover" alt="icon" />
+            ) : (
+              <span className={uiConfig.flagSizeClass}>{player.flag || '📍'}</span>
+            )}
+          </div>
+
+          {/* ピンの針 (動的スケーリング) */}
+          <div 
+            className="pin-needle w-0 h-0 border-l-transparent border-r-transparent -mt-[1px] transition-all duration-300"
+            style={{
+              borderLeftWidth: `${uiConfig.needleWidth}px`,
+              borderRightWidth: `${uiConfig.needleWidth}px`,
+              borderTopWidth: `${uiConfig.needleHeight}px`,
+              borderTopColor: isGold 
+                ? '#fbbf24' 
+                : player.isWinner 
+                  ? '#10b981' 
+                  : player.isLoser 
+                    ? '#64748b' 
+                    : player.position.slot === 1
+                      ? '#f43f5e'
+                      : '#3b82f6'
+            }}
+          />
+
+          {/* 各プレイヤーのピンの下部に名前を常に表示 */}
+          <div className={`mt-1.5 font-black px-2.5 py-0.5 rounded-md border truncate text-center leading-none transition-all duration-300 ${uiConfig.nameMaxW} ${uiConfig.nameTextSize} ${
+            player.isBye
+              ? 'text-slate-500 bg-slate-900 border-slate-800'
+              : player.isLoser 
+                ? 'text-slate-300 line-through bg-slate-950/65 border-slate-800/80 shadow-inner' 
+                : 'text-slate-100 bg-slate-950/85 border-slate-700/80 shadow-sm shadow-black/45'
+          }`}>
+            {player.isBye ? 'SEED' : player.name}
+          </div>
+        </div>
+      );
+    }
+
+    // シード順序を生成する関数 (1回戦の枠に対する配置順)
+    const getSeedOrder = (size) => {
+      if (size <= 2) return [0, 1];
+      const half = getSeedOrder(size / 2);
+      const res = [];
+      half.forEach(seed => {
+        res.push(seed);
+        res.push(size - 1 - seed);
+      });
+      return res;
+    };
+
+    // メインアプリケーション
+    function App() {
+      const saved = useMemo(() => {
+        const d = SERVER ? (REMOTE && REMOTE.state) || (ADMIN ? loadJSON(STORAGE_KEY) : null) : loadJSON(STORAGE_KEY);
+        return d && d.kind === 'bracket-maker-save' && Array.isArray(d.matches) && d.matches.length ? d : null;
+      }, []);
+      const skipInit = useRef(!!saved);
+      const [playerCount, setPlayerCount] = useState(saved?.playerCount ?? 8);
+      const [rules, setRules] = useState(() => mergeRules(saved?.rules ?? GAME_PRESETS.geoguessr.rules));
+      const setRule = (patch) => setRules(prev => ({ ...prev, ...patch }));
+      const [repechage, setRepechage] = useState(saved?.repechage ?? null);
+      const [view, setView] = useState(() => (IS_DISPLAY && (initLive() || {}).view) || 'main');
+      const [settingsTab, setSettingsTab] = useState('basic');
+      const [userPresets, setUserPresets] = useState(() => loadJSON(PRESET_KEY) || []);
+      const [presetChoice, setPresetChoice] = useState('geoguessr');
+      const [saveState, setSaveState] = useState('saved');
+      const [bulkText, setBulkText] = useState('');
+      const [liveBg, setLiveBg] = useState('theme');
+      const [liveTitle, setLiveTitle] = useState(false);
+      const [liveMirror, setLiveMirror] = useState(true);
+      const [announce, setAnnounce] = useState(null);
+      const [copied, setCopied] = useState(false);
+      const announceTimer = useRef(null);
+      
+      const [players, setPlayers] = useState(saved?.players ?? []);
+      const [matches, setMatches] = useState(saved?.matches ?? []);
+      const [championId, setChampionId] = useState(saved?.championId ?? null);
+      const [showSettings, setShowSettings] = useState(false);
+      const [showRanking, setShowRanking] = useState(() => IS_DISPLAY && !!(initLive() || {}).showRanking);
+      const [customNames, setCustomNames] = useState(saved?.customNames ?? {});
+      const [customFlags, setCustomFlags] = useState(saved?.customFlags ?? {});
+      const [playerHp, setPlayerHp] = useState(saved?.playerHp ?? {}); // 負けたプレイヤーの残り体力
+      const [isPreviewMode, setIsPreviewMode] = useState(RO); // プレビューモード (閲覧専用では常に操作UIを隠す)
+      const [tournamentTitle, setTournamentTitle] = useState(saved?.tournamentTitle ?? 'GEO GUESSR RPG杯');
+      const [tournamentSubtitle, setTournamentSubtitle] = useState(saved?.tournamentSubtitle ?? 'Geoguessr Tournament Bracket');
+      const [bgTheme, setBgTheme] = useState(THEMES[saved?.bgTheme] ? saved.bgTheme : (saved?.bgTheme === 'custom' ? 'dark' : 'earth'));
+      const [bg, setBg] = useState(() => normBg(saved));
+      const setBgPart = (patch) => setBg(prev => ({ ...prev, ...patch }));
+      const [synced, setSynced] = useState(!!saved);
+      const [syncState, setSyncState] = useState(SERVER ? 'ok' : 'local');
+      const lastRemoteChamp = useRef(saved?.championId ?? null);
+
+      const boardRef = useRef(null);
+      const [boardScale, setBoardScale] = useState(1);
+
+      const baseW = 1400;
+      const baseH = 850;
+
+      const bracketSize = useMemo(() => Math.max(4, Math.pow(2, Math.ceil(Math.log2(playerCount)))), [playerCount]);
+      const numRounds = Math.log2(bracketSize);
+
+      // 参加人数 (4, 8, 16, 32人枠) に応じた動的サイズスケーリング設定
+      const uiConfig = useMemo(() => {
+        if (bracketSize <= 4) {
+          return {
+            pinSize: 72,
+            needleWidth: 9,
+            needleHeight: 13,
+            pinClass: 'border-3.5 text-3xl',
+            flagSizeClass: 'text-3xl',
+            nameTextSize: 'text-sm font-black',
+            nameMaxW: 'max-w-[130px]',
+            offset: 140, // 左右ピン of X方向初期オフセット
+            panelW: 130, 
+            panelH: 'h-[40px]',
+            btnText: 'text-[11px] px-3.5 py-1.5 font-black',
+            btnLabel: 'WIN',
+            vsText: 'text-xs text-slate-500 font-extrabold',
+            bridgeOffset: 70 // ピンの底から上の水平ブリッジまでの垂直距離
+          };
+        } else if (bracketSize <= 8) {
+          return {
+            pinSize: 56,
+            needleWidth: 7,
+            needleHeight: 10,
+            pinClass: 'border-3.5 text-2xl',
+            flagSizeClass: 'text-2xl',
+            nameTextSize: 'text-[12px] font-black',
+            nameMaxW: 'max-w-[110px]',
+            offset: 100,
+            panelW: 110,
+            panelH: 'h-[38px]',
+            btnText: 'text-[10px] px-2.5 py-1 font-black',
+            btnLabel: 'WIN',
+            vsText: 'text-[9px] text-slate-500 font-bold',
+            bridgeOffset: 60
+          };
+        } else if (bracketSize <= 16) {
+          return {
+            pinSize: 44,
+            needleWidth: 5,
+            needleHeight: 8,
+            pinClass: 'border-2.5 text-xl',
+            flagSizeClass: 'text-xl',
+            nameTextSize: 'text-[11px] font-black',
+            nameMaxW: 'max-w-[84px]',
+            offset: 60,
+            panelW: 96,
+            panelH: 'h-[32px]',
+            btnText: 'text-[9px] px-2 py-0.5 font-black',
+            btnLabel: 'WIN',
+            vsText: 'text-[8px] text-slate-500 font-bold',
+            bridgeOffset: 50
+          };
+        } else { // 32人
+          return {
+            pinSize: 32,
+            needleWidth: 4,
+            needleHeight: 6,
+            pinClass: 'border-2 text-sm',
+            flagSizeClass: 'text-sm',
+            nameTextSize: 'text-[9px] font-black',
+            nameMaxW: 'max-w-[60px]',
+            offset: 40,
+            panelW: 76,
+            panelH: 'h-[24px]',
+            btnText: 'text-[8px] px-1.5 py-0.5 font-bold',
+            btnLabel: 'WIN',
+            vsText: 'text-[7px] text-slate-500 font-bold',
+            bridgeOffset: 40
+          };
+        }
+      }, [bracketSize]);
+
+      const togglePreviewMode = async (enable) => {
+        setIsPreviewMode(enable);
+        try {
+          if (enable) {
+            if (document.documentElement.requestFullscreen) {
+              await document.documentElement.requestFullscreen();
+            }
+          } else {
+            if (document.fullscreenElement && document.exitFullscreen) {
+              await document.exitFullscreen();
+            }
+          }
+        } catch (err) {
+          console.warn("Fullscreen API failed", err);
+        }
+      };
+
+      useEffect(() => {
+        const handleFullscreenChange = () => {
+          if (!document.fullscreenElement && isPreviewMode && !RO) {
+            setIsPreviewMode(false);
+          }
+        };
+        const handleKeyDown = (e) => {
+          if (e.key === 'Escape') {
+            if (IS_DISPLAY) return;
+            if (VIEWER) { setShowRanking(false); return; }
+            if (isPreviewMode) togglePreviewMode(false);
+            else { setShowRanking(false); setShowSettings(false); }
+          }
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+          document.removeEventListener('fullscreenchange', handleFullscreenChange);
+          window.removeEventListener('keydown', handleKeyDown);
+        };
+      }, [isPreviewMode]);
+
+      // 画面サイズ調整: ボード表示エリア(ヘッダー/フッターを除いた実寸)に全体が収まる倍率を計算
+      const mainRef = useRef(null);
+      useEffect(() => {
+        const el = mainRef.current;
+        if (!el) return;
+        const fit = () => {
+          const w = el.clientWidth - 16;
+          const h = el.clientHeight - 16;
+          if (w <= 0 || h <= 0) return;   // 敗者復活戦タブ表示中(非表示)は無視
+          setBoardScale(Math.max(0.2, Math.min(w / baseW, h / baseH, 1.6)));
+        };
+        fit();
+        const ro = new ResizeObserver(fit);
+        ro.observe(el);
+        return () => ro.disconnect();
+      }, [view, isPreviewMode]);
+
+      // チャンピオンピンの配置座標 (最上部中央)
+      const championCoords = {
+        x: baseW / 2,
+        y: 220
+      };
+
+      // 各試合の中心座標を数学的対称(対戦相手の完璧な中間)で再帰計算する関数
+      const getMatchCenterCoordinates = (rIndex, mIndex) => {
+        // 2回戦以降の縦線を短くするため、トーナメント全体の高さを圧縮
+        const stepY = (baseH - 380) / numRounds;
+        const y = baseH - 160 - rIndex * stepY;
+
+        if (rIndex === 0) {
+          // 1回戦の試合の中心X座標
+          const numMatches = bracketSize / 2;
+          const segmentW = baseW / numMatches;
+          const x = segmentW * (mIndex + 0.5);
+          return { x, y };
+        } else {
+          // 2回戦以降の試合の中心X座標は、前のラウンドの進出元2つの試合の中央になる
+          const leftParent = getMatchCenterCoordinates(rIndex - 1, mIndex * 2);
+          const rightParent = getMatchCenterCoordinates(rIndex - 1, mIndex * 2 + 1);
+          const x = (leftParent.x + rightParent.x) / 2;
+          return { x, y };
+        }
+      };
+
+      // プレイヤーピンの配置座標 (垂直直線で完璧に繋がるように、進出元試合の中心座標とX座標を完全一致させる)
+      const getPlayerCoords = (player) => {
+        if (!player) return { x: 0, y: 0 };
+        
+        if (player.position.round === numRounds) {
+          return championCoords;
+        }
+
+        const rIndex = player.position.round;
+        const mIndex = player.position.match;
+        const slot = player.position.slot;
+
+        if (rIndex === 0) {
+          // 1回戦：各試合の中心から offset 分だけ左右に配置し、さらに低く配置する
+          const mCenter = getMatchCenterCoordinates(0, mIndex);
+          const x = mCenter.x + (slot === 1 ? -uiConfig.offset : uiConfig.offset);
+          return { x, y: mCenter.y + uiConfig.bridgeOffset * 1.8 };
+        } else {
+          // 2回戦以降：線の角（水平ブリッジの両端点）の真上に完璧に乗せる！
+          const leftParent = getMatchCenterCoordinates(rIndex - 1, mIndex * 2);
+          const rightParent = getMatchCenterCoordinates(rIndex - 1, mIndex * 2 + 1);
+          const x = slot === 1 ? leftParent.x : rightParent.x;
+          
+          // Y座標は、そのラウンドの試合のブリッジの高さ (mCenter.y - bridgeOffset) と完全に一致させる！
+          const currentMatchCenter = getMatchCenterCoordinates(rIndex, mIndex);
+          return { x, y: currentMatchCenter.y - uiConfig.bridgeOffset };
+        }
+      };
+
+      // 順位計算ロジック (ルールは大会設定 rules で変更可能)
+      // 生存優先 > 勝利ラウンド数 > 敗者復活戦の勝ち数 > (設定により) スコア / 同順位 / シード順
+      const winsMap = useMemo(() => {
+        const map = {};
+        players.forEach(p => { map[p.id] = 0; });
+        matches.forEach(round => round.forEach(match => {
+          if (match.winnerId) map[match.winnerId] = (map[match.winnerId] || 0) + 1;
+        }));
+        return map;
+      }, [players, matches]);
+
+      // 敗者復活戦の対象者 (fromラウンド〜toラウンドで敗退した選手)
+      const repEligible = useMemo(() => {
+        if (!rules.repechage.enabled) return [];
+        return players.filter(p => {
+          if (p.isBye || !p.isLoser || p.id === championId) return false;
+          const lost = (winsMap[p.id] || 0) + 1;
+          return lost >= rules.repechage.from && lost <= rules.repechage.to;
+        });
+      }, [players, winsMap, championId, rules.repechage]);
+
+      const repDerived = useMemo(
+        () => deriveRep(repechage ? repechage.entrants : [], repechage ? repechage.picks : {}),
+        [repechage]
+      );
+      const repStale = useMemo(() => {
+        if (!repechage) return false;
+        const a = [...repechage.entrants].sort().join(',');
+        const b = repEligible.map(p => p.id).sort().join(',');
+        return a !== b;
+      }, [repechage, repEligible]);
+
+      const computeRankings = useMemo(() => {
+        const allPlayers = players
+          .filter(p => !p.isBye)
+          .map((p, seedIdx) => {
+            const wonRounds = winsMap[p.id] || 0;
+            const hpVal = Number(playerHp[p.id]) || 0;
+            let hpPart = 0;
+            if (p.isLoser) hpPart = rules.hpMode === 'add' ? hpVal : rules.hpMode === 'subtract' ? -hpVal : 0;
+            return {
+              player: p,
+              seedIdx,
+              isAlive: p.id === championId || !p.isLoser,
+              wonRounds,
+              repWins: repDerived.wins[p.id] || 0,
+              isRepChamp: repDerived.champion === p.id,
+              totalDamage: wonRounds * rules.pointsPerWin + hpPart,
+              hp: hpVal
+            };
+          });
+
+        const useScore = rules.tiebreak === 'score';
+        allPlayers.sort((a, b) => {
+          if (a.isAlive !== b.isAlive) return a.isAlive ? -1 : 1;
+          if (b.wonRounds !== a.wonRounds) return b.wonRounds - a.wonRounds;
+          if (b.repWins !== a.repWins) return b.repWins - a.repWins;
+          if (useScore && a.totalDamage !== b.totalDamage) {
+            return rules.rankOrder === 'asc' ? a.totalDamage - b.totalDamage : b.totalDamage - a.totalDamage;
+          }
+          return a.seedIdx - b.seedIdx;
+        });
+
+        let currentRank = 1;
+        return allPlayers.map((entry, idx) => {
+          if (idx > 0) {
+            const prev = allPlayers[idx - 1];
+            const same = prev.isAlive === entry.isAlive && prev.wonRounds === entry.wonRounds && prev.repWins === entry.repWins
+              && rules.tiebreak !== 'seed' && (!useScore || prev.totalDamage === entry.totalDamage);
+            if (!same) currentRank = idx + 1;
+          }
+          return { rank: currentRank, ...entry };
+        });
+      }, [players, winsMap, playerHp, championId, rules, repDerived]);
+
+
+      const handlePlayerUpdate = (id, newName, newFlag) => {
+        setPlayers(prev => prev.map(p => p.id === id ? { ...p, name: newName, flag: newFlag } : p));
+        setCustomNames(prev => ({ ...prev, [id]: newName }));
+        setCustomFlags(prev => ({ ...prev, [id]: newFlag }));
+      };
+
+      // 残り体力を更新する
+      const handleSetHp = (id, value) => {
+        const parsed = value === '' ? null : Number(value);
+        setPlayerHp(prev => ({ ...prev, [id]: parsed }));
+      };
+
+      // 順位に対応するラベルを返す
+      const getRoundLabel = (lostRound) => {
+        const total = Math.log2(bracketSize);
+        if (lostRound >= total) return '🏆 優勝';
+        if (lostRound === total - 1) return '準優勝';
+        if (lostRound === total - 2) return '3位';
+        return `TOP ${Math.pow(2, total - lostRound)}`;
+      };
+
+      // 大会設定画面で表示・編集するための、エントリー時の全プレイヤーリスト
+      const entryPlayers = useMemo(() => {
+        return Array.from({ length: playerCount }).map((_, i) => {
+          const defaultName = (DEFAULT_PLAYERS[i] || {}).name || `Player ${i + 1}`;
+          const customName = customNames[`p${i + 1}`];
+          const customFlag = customFlags[`p${i + 1}`];
+          return {
+            id: `p${i + 1}`,
+            name: customName !== undefined ? customName : defaultName,
+            flag: customFlag !== undefined ? customFlag : ((DEFAULT_PLAYERS[i] || {}).flag || '📍')
+          };
+        });
+      }, [playerCount, customNames, customFlags]);
+
+      // トーナメント初期化
+      const initializeTournament = (count, customList = null) => {
+        setChampionId(null);
+        
+        const bSize = Math.max(4, Math.pow(2, Math.ceil(Math.log2(count))));
+        const seedOrder = getSeedOrder(bSize);
+        
+        // customListが渡されていればそれを使う、なければデフォルトから生成
+        let basePlayers = customList;
+        if (!basePlayers) {
+            basePlayers = [];
+            for (let i = 0; i < count; i++) {
+              const defaultData = DEFAULT_PLAYERS[i] || { name: `Player ${i+1}`, flag: '📍' };
+              const customName = customNames[`p${i+1}`];
+              const customFlag = customFlags[`p${i+1}`];
+              basePlayers.push({
+                  id: `p${i+1}`,
+                  name: customName !== undefined ? customName : defaultData.name,
+                  flag: customFlag !== undefined ? customFlag : defaultData.flag
+              });
+            }
+        }
+
+        const activePlayers = [];
+        
+        // seedOrderに基づいてスロットを埋める
+        for (let i = 0; i < bSize; i++) {
+            const seedRank = seedOrder[i];
+            if (seedRank < count) {
+                // プレイヤーが入る
+                const p = basePlayers[seedRank];
+                activePlayers.push({
+                    id: p.id,
+                    name: p.name,
+                    flag: p.flag,
+                    score: 0,
+                    isWinner: false,
+                    isLoser: false,
+                    position: {
+                        round: 0,
+                        match: Math.floor(i / 2),
+                        slot: (i % 2) + 1
+                    }
+                });
+            } else {
+                // Bye (シード枠のダミー)
+                activePlayers.push({
+                    id: `bye-${i}`,
+                    name: "Bye",
+                    flag: "",
+                    isBye: true,
+                    score: 0,
+                    isWinner: false,
+                    isLoser: true, 
+                    position: {
+                        round: 0,
+                        match: Math.floor(i / 2),
+                        slot: (i % 2) + 1
+                    }
+                });
+            }
+        }
+
+        const rCount = Math.log2(bSize);
+        const newMatches = [];
+
+        for (let r = 0; r < rCount; r++) {
+          const roundMatches = [];
+          const numMatches = bSize / Math.pow(2, r + 1);
+          for (let m = 0; m < numMatches; m++) {
+            roundMatches.push({
+              id: `${r}-${m}`,
+              round: r,
+              match: m,
+              player1Id: r === 0 ? activePlayers[m * 2].id : null,
+              player2Id: r === 0 ? activePlayers[m * 2 + 1].id : null,
+              winnerId: null,
+              isLocked: r !== 0
+            });
+          }
+          newMatches.push(roundMatches);
+        }
+        
+        // 自動でByeとの試合を解決する (不戦勝)
+        newMatches[0].forEach((match, mIndex) => {
+            const p1 = activePlayers.find(p => p.id === match.player1Id);
+            const p2 = activePlayers.find(p => p.id === match.player2Id);
+            
+            if (p1 && p1.isBye && p2 && !p2.isBye) {
+                match.winnerId = p2.id;
+                p2.isWinner = true;
+                p2.position = { round: 1, match: Math.floor(mIndex / 2), slot: (mIndex % 2) === 0 ? 1 : 2 };
+            } else if (p2 && p2.isBye && p1 && !p1.isBye) {
+                match.winnerId = p1.id;
+                p1.isWinner = true;
+                p1.position = { round: 1, match: Math.floor(mIndex / 2), slot: (mIndex % 2) === 0 ? 1 : 2 };
+            }
+        });
+        
+        // 次のラウンドにシード勝者を設定
+        newMatches[0].forEach((match, mIndex) => {
+            if (match.winnerId) {
+                const nextMatch = newMatches[1][Math.floor(mIndex / 2)];
+                if (mIndex % 2 === 0) nextMatch.player1Id = match.winnerId;
+                else nextMatch.player2Id = match.winnerId;
+                
+                if (nextMatch.player1Id && nextMatch.player2Id) nextMatch.isLocked = false;
+            }
+        });
+
+        // Byeも含めて全プレイヤーをステートに保存 (Byeを表示して山を完成させる)
+        setPlayers(activePlayers);
+        setMatches(newMatches);
+      };
+
+      // 選手をシャッフルする処理
+      const handleShuffle = () => {
+        setChampionId(null);
+
+        const shuffled = [...entryPlayers].sort(() => 0.5 - Math.random());
+        
+        const newCustomNames = {};
+        const newCustomFlags = {};
+        shuffled.forEach((p, idx) => {
+          newCustomNames[`p${idx+1}`] = p.name;
+          newCustomFlags[`p${idx+1}`] = p.flag;
+        });
+        setCustomNames(newCustomNames);
+        setCustomFlags(newCustomFlags);
+
+        initializeTournament(playerCount, shuffled.map((p, i) => ({ ...p, id: `p${i+1}` })));
+      };
+
+      useEffect(() => {
+        if (skipInit.current) { skipInit.current = false; return; }
+        setRepechage(null);
+        initializeTournament(playerCount);
+      }, [playerCount]);
+
+      const handleSetWinner = (roundIndex, matchIndex, winnerKey) => {
+        const nextMatches = [...matches];
+        const match = { ...nextMatches[roundIndex][matchIndex] };
+        
+        const p1Id = match.player1Id;
+        const p2Id = match.player2Id;
+        if (!p1Id || !p2Id) return;
+
+        const winnerId = winnerKey === 'player1' ? p1Id : p2Id;
+        const loserId = winnerKey === 'player1' ? p2Id : p1Id;
+
+        // もしすでに以前勝者が設定されていた場合は、その勝者の進出先の情報を再帰クリアする
+        if (match.winnerId && match.winnerId !== winnerId) {
+          clearUpperRounds(nextMatches, roundIndex + 1, Math.floor(matchIndex / 2), match.winnerId);
+        }
+
+        match.winnerId = winnerId;
+        nextMatches[roundIndex][matchIndex] = match;
+
+        setPlayers(prevPlayers => {
+          return prevPlayers.map(p => {
+            if (p.id === winnerId) {
+              const isFinalRound = roundIndex === nextMatches.length - 1;
+              const nextRound = roundIndex + 1;
+              const nextMatch = Math.floor(matchIndex / 2);
+              const nextSlot = (matchIndex % 2 === 0) ? 1 : 2;
+
+              return {
+                ...p,
+                isWinner: true,
+                isLoser: false, // 勝者は敗退状態ではない
+                position: isFinalRound
+                  ? { round: nextRound, match: 0, slot: 0 }
+                  : { round: nextRound, match: nextMatch, slot: nextSlot }
+              };
+            }
+            if (p.id === loserId) {
+              return {
+                ...p,
+                isWinner: false,
+                isLoser: true
+              };
+            }
+            return p;
+          });
+        });
+
+        const isFinalRound = roundIndex === nextMatches.length - 1;
+
+        if (isFinalRound) {
+          setMatches(nextMatches);
+          setChampionId(winnerId);
+          triggerChampionEffects();
+        } else {
+          const nextRoundIndex = roundIndex + 1;
+          const nextMatchIndex = Math.floor(matchIndex / 2);
+          const nextMatch = { ...nextMatches[nextRoundIndex][nextMatchIndex] };
+
+          const isP1Slot = matchIndex % 2 === 0;
+          if (isP1Slot) {
+            nextMatch.player1Id = winnerId;
+          } else {
+            nextMatch.player2Id = winnerId;
+          }
+
+          if (nextMatch.player1Id && nextMatch.player2Id) {
+            nextMatch.isLocked = false;
+          }
+
+          nextMatches[nextRoundIndex][nextMatchIndex] = nextMatch;
+          setMatches(nextMatches);
+        }
+      };
+
+      // 決定した勝利を取り消して、再度WINボタンを表示できるようにする処理（間違い修正用）
+      const handleUndoWinner = (roundIndex, matchIndex) => {
+        const nextMatches = [...matches];
+        const match = { ...nextMatches[roundIndex][matchIndex] };
+        const prevWinnerId = match.winnerId;
+
+        if (!prevWinnerId) return;
+
+        match.winnerId = null;
+        nextMatches[roundIndex][matchIndex] = match;
+
+        setPlayers(prevPlayers => {
+          const p1Id = match.player1Id;
+          const p2Id = match.player2Id;
+
+          return prevPlayers.map(p => {
+            if (p.id === prevWinnerId) {
+              // 以前の勝者をこのラウンドの配置位置に戻す
+              return {
+                ...p,
+                isWinner: false,
+                position: {
+                  round: roundIndex,
+                  match: matchIndex,
+                  slot: p.id === p1Id ? 1 : 2
+                }
+              };
+            }
+            if (p.id === p1Id || p.id === p2Id) {
+              // 敗者状態を解除する
+              return {
+                ...p,
+                isLoser: false
+              };
+            }
+            return p;
+          });
+        });
+
+        // 上位に進出している対象プレイヤー情報を再帰的にクリア
+        if (roundIndex < nextMatches.length - 1) {
+          clearUpperRounds(nextMatches, roundIndex + 1, Math.floor(matchIndex / 2), prevWinnerId);
+        } else {
+          setChampionId(null);
+        }
+
+        setMatches(nextMatches);
+      };
+
+      // 上位に進出してしまっている勝者IDを再帰的に空にするヘルパー
+      const clearUpperRounds = (matchesArray, rIndex, mIndex, targetPlayerId) => {
+        if (rIndex >= matchesArray.length) return;
+
+        const match = { ...matchesArray[rIndex][mIndex] };
+        let changed = false;
+
+        if (match.player1Id === targetPlayerId) {
+          match.player1Id = null;
+          match.isLocked = true;
+          changed = true;
+        } else if (match.player2Id === targetPlayerId) {
+          match.player2Id = null;
+          match.isLocked = true;
+          changed = true;
+        }
+
+        const prevWinnerId = match.winnerId;
+        if (prevWinnerId === targetPlayerId) {
+          match.winnerId = null;
+          changed = true;
+        }
+
+        if (changed) {
+          matchesArray[rIndex][mIndex] = match;
+          // さらに対象プレイヤーの敗者状態も、上のラウンドで敗退していた場合に備えて解除する
+          setPlayers(prev => prev.map(p => p.id === targetPlayerId ? { ...p, isLoser: false, isWinner: false } : p));
+
+          if (rIndex < matchesArray.length - 1) {
+            clearUpperRounds(matchesArray, rIndex + 1, Math.floor(mIndex / 2), targetPlayerId);
+          } else {
+            setChampionId(null);
+          }
+        }
+      };
+
+      const triggerChampionEffects = () => {
+        const duration = 6 * 1000;
+        const end = Date.now() + duration;
+
+        const frame = () => {
+          confetti({
+            particleCount: 6,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0, y: 0.8 },
+            colors: ['#fbbf24', '#f59e0b', '#3b82f6', '#ef4444', '#10b981']
+          });
+          confetti({
+            particleCount: 6,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1, y: 0.8 },
+            colors: ['#fbbf24', '#f59e0b', '#3b82f6', '#ef4444', '#10b981']
+          });
+
+          if (Date.now() < end) {
+            requestAnimationFrame(frame);
+          }
+        };
+        frame();
+      };
+
+      // PIXTAの見本画像と全く同一の、無駄な曲がりのない完璧な対称形トーナメント線を描画
+      // 角は丸くしつつ、接合部分 of 白丸ポッチを防ぐために一筆書きパスとLinejoinを活用。一段目の棒（垂直線）は省略。
+      const renderRoads = () => {
+        const paths = [];
+
+        matches.forEach((round, rIndex) => {
+          const isFinalRound = rIndex === matches.length - 1;
+
+          round.forEach((match, mIndex) => {
+            // 現在の試合の中心座標
+            const mCenter = getMatchCenterCoordinates(rIndex, mIndex);
+            
+            // プレイヤー1とプレイヤー2 of X座標 (前の対戦の中心と完全に重なっている)
+            let p1X, p2X;
+            if (rIndex === 0) {
+              p1X = mCenter.x - uiConfig.offset;
+              p2X = mCenter.x + uiConfig.offset;
+            } else {
+              const leftParent = getMatchCenterCoordinates(rIndex - 1, mIndex * 2);
+              const rightParent = getMatchCenterCoordinates(rIndex - 1, mIndex * 2 + 1);
+              p1X = leftParent.x;
+              p2X = rightParent.x;
+            }
+
+            const active = match.winnerId !== null;
+
+            // 水平ブリッジのY座標 (ピンの上端より少し上の位置)
+            const bridgeY = mCenter.y - uiConfig.bridgeOffset;
+
+            // 次の対戦のY座標、またはチャンピオンのY座標まで垂直に伸びる。
+            // 【重要】進出したプレイヤーピンの配置Y座標(線の角)まで白い光の線を伸ばすため、次のラウンドのブリッジの高さ(nextMatchCenter.y - bridgeOffset)まで完全に伸ばします。
+            const nextY = isFinalRound 
+              ? championCoords.y 
+              : getMatchCenterCoordinates(rIndex + 1, Math.floor(mIndex / 2)).y - uiConfig.bridgeOffset;
+
+            // アクティブな進路（勝者が決まり、進出したルート）の判定
+            const isP1Active = active && match.winnerId === match.player1Id;
+            const isP2Active = active && match.winnerId === match.player2Id;
+
+            if (rIndex === 0) {
+              const pinY = mCenter.y + uiConfig.bridgeOffset * 1.8;
+              // 1回戦の基本パス (ピンから上にブリッジまで上がり、中央に寄って、上に伸びる)
+              const leftRoutePath = `M ${p1X} ${pinY} L ${p1X} ${mCenter.y} L ${mCenter.x} ${mCenter.y} L ${mCenter.x} ${nextY}`;
+              const rightRoutePath = `M ${p2X} ${pinY} L ${p2X} ${mCenter.y} L ${mCenter.x} ${mCenter.y} L ${mCenter.x} ${nextY}`;
+              
+              // グレー背景線用（重ねないための右半分: ピンから上に上がり中央まで）
+              const rightHorizontalOnly = `M ${p2X} ${pinY} L ${p2X} ${mCenter.y} L ${mCenter.x} ${mCenter.y}`;
+
+              paths.push(
+                <g key={`road-${rIndex}-${mIndex}`}>
+                  {/* グレー背景線（左＋垂直） */}
+                  <path
+                    d={leftRoutePath}
+                    stroke="rgba(255, 255, 255, 0.15)"
+                    strokeWidth="16"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                  {/* グレー背景線（右） */}
+                  <path
+                    d={rightHorizontalOnly}
+                    stroke="rgba(255, 255, 255, 0.15)"
+                    strokeWidth="16"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                  {/* アクティブな白光り線（進出した場合のみ重ねる） */}
+                  {isP1Active && (
+                    <path
+                      d={leftRoutePath}
+                      stroke="#ffffff"
+                      strokeWidth="16"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                      style={{
+                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))',
+                        transition: 'stroke 0.4s, filter 0.4s'
+                      }}
+                    />
+                  )}
+                  {isP2Active && (
+                    <path
+                      d={rightRoutePath}
+                      stroke="#ffffff"
+                      strokeWidth="16"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                      style={{
+                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))',
+                        transition: 'stroke 0.4s, filter 0.4s'
+                      }}
+                    />
+                  )}
+                </g>
+              );
+            } else {
+              // 2回戦以降の基本パス
+              const leftRoutePath = `M ${p1X} ${bridgeY} L ${mCenter.x} ${bridgeY} L ${mCenter.x} ${nextY}`;
+              const rightRoutePath = `M ${p2X} ${bridgeY} L ${mCenter.x} ${bridgeY} L ${mCenter.x} ${nextY}`;
+              
+              // グレー背景線用（重ねないための右半分）
+              const rightHorizontalOnly = `M ${p2X} ${bridgeY} L ${mCenter.x} ${bridgeY}`;
+
+              paths.push(
+                <g key={`road-${rIndex}-${mIndex}`}>
+                  {/* グレー背景線（左＋垂直） */}
+                  <path
+                    d={leftRoutePath}
+                    stroke="rgba(255, 255, 255, 0.15)"
+                    strokeWidth="16"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                  {/* グレー背景線（右） */}
+                  <path
+                    d={rightHorizontalOnly}
+                    stroke="rgba(255, 255, 255, 0.15)"
+                    strokeWidth="16"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                  {/* アクティブな白光り線（進出した場合のみ重ねる） */}
+                  {isP1Active && (
+                    <path
+                      d={leftRoutePath}
+                      stroke="#ffffff"
+                      strokeWidth="16"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                      style={{
+                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))',
+                        transition: 'stroke 0.4s, filter 0.4s'
+                      }}
+                    />
+                  )}
+                  {isP2Active && (
+                    <path
+                      d={rightRoutePath}
+                      stroke="#ffffff"
+                      strokeWidth="16"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                      style={{
+                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 1))',
+                        transition: 'stroke 0.4s, filter 0.4s'
+                      }}
+                    />
+                  )}
+                </g>
+              );
+            }
+          });
+        });
+
+        return (
+          <svg className="bracket-svg absolute inset-0 w-full h-full pointer-events-none z-10">
+            {paths}
+          </svg>
+        );
+      };
+
+      useEffect(() => { document.title = `${tournamentTitle || 'Tournament'} - Bracket`; }, [tournamentTitle]);
+
+      const pmap = useMemo(() => Object.fromEntries(players.map(p => [p.id, p])), [players]);
+      const repRoundOptions = useMemo(() => Array.from({ length: Math.max(0, numRounds - 1) }, (_, i) => i + 1), [numRounds]);
+      const podiumEntries = rules.rankView === 'podium' ? computeRankings.slice(0, 3) : [];
+      const listEntries = (rules.rankView === 'podium' ? computeRankings.slice(3) : computeRankings)
+        .filter(e => !rules.rankTopN || e.rank <= rules.rankTopN);
+
+      // ---------- 敗者復活戦の操作 ----------
+      const handleRepGenerate = () => {
+        if (repEligible.length < 2) return;
+        setRepechage({ entrants: repEligible.map(p => p.id), picks: {} });
+      };
+      const clearDownstream = (picks, r, m) => {
+        const next = { ...picks };
+        let rr = r + 1, mm = m >> 1;
+        while (rr < repDerived.rounds.length) { delete next[`${rr}-${mm}`]; rr++; mm >>= 1; }
+        return next;
+      };
+      const handleRepPick = (r, m, side) => {
+        setRepechage(prev => prev && ({ ...prev, picks: { ...clearDownstream(prev.picks, r, m), [`${r}-${m}`]: side } }));
+      };
+      const handleRepUndo = (r, m) => {
+        setRepechage(prev => {
+          if (!prev) return prev;
+          const next = clearDownstream(prev.picks, r, m);
+          delete next[`${r}-${m}`];
+          return { ...prev, picks: next };
+        });
+      };
+
+      // ---------- プリセット ----------
+      const buildPlayerList = (src) => Array.from({ length: 32 }, (_, i) => (src && src[i]) ? { name: src[i].name, flag: src[i].flag } : { name: `Player ${i + 1}`, flag: '📍' });
+      const applyPresetData = (p) => {
+        setRules(mergeRules(p.rules));
+        setBgTheme(p.theme || 'dark');
+        setTournamentTitle(p.title || 'TOURNAMENT');
+        setTournamentSubtitle(p.subtitle || '');
+        const list = buildPlayerList(p.players);
+        const names = {}, flags = {};
+        list.forEach((x, i) => { names[`p${i + 1}`] = x.name; flags[`p${i + 1}`] = x.flag; });
+        setCustomNames(names);
+        setCustomFlags(flags);
+        setPlayerHp({});
+        setRepechage(null);
+        setView('main');
+        initializeTournament(playerCount, list.slice(0, playerCount).map((x, i) => ({ id: `p${i + 1}`, ...x })));
+      };
+      const handleApplyPreset = () => {
+        const p = presetChoice.startsWith('user:')
+          ? userPresets.find(u => u.id === presetChoice.slice(5))
+          : GAME_PRESETS[presetChoice];
+        if (!p) return;
+        if (!window.confirm(`プリセット「${p.name}」を適用します。現在のトーナメント進行はリセットされます。よろしいですか?`)) return;
+        applyPresetData(p);
+      };
+      const handleSavePreset = () => {
+        const name = window.prompt('プリセット名を入力してください (例: ○○ゲーム大会)', tournamentTitle);
+        if (!name) return;
+        const preset = {
+          id: String(Date.now()), name, theme: bgTheme === 'custom' ? 'dark' : bgTheme,
+          title: tournamentTitle, subtitle: tournamentSubtitle, rules,
+          players: entryPlayers.map(p => ({ name: p.name, flag: p.flag })),
+        };
+        const next = [...userPresets, preset];
+        setUserPresets(next);
+        saveJSON(PRESET_KEY, next);
+        setPresetChoice(`user:${preset.id}`);
+      };
+      const handleDeletePreset = () => {
+        if (!presetChoice.startsWith('user:')) return;
+        const id = presetChoice.slice(5);
+        const next = userPresets.filter(u => u.id !== id);
+        setUserPresets(next);
+        saveJSON(PRESET_KEY, next);
+        setPresetChoice('geoguessr');
+      };
+
+      // ---------- 保存 / 書き出し / 読み込み ----------
+      const snapshot = () => ({
+        kind: 'bracket-maker-save', version: 2,
+        playerCount, players, matches, championId, customNames, customFlags, playerHp,
+        tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage,
+      });
+
+      useEffect(() => {
+        if (!matches.length || RO) return;
+        const ok = saveJSON(STORAGE_KEY, snapshot());
+        setSaveState(ok ? 'saved' : 'error');
+      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage]);
+
+      // 管理者 → サーバーへ送信 (観戦者へリアルタイム配信される)
+      useEffect(() => {
+        if (!ADMIN || !matches.length) return;
+        const t = setTimeout(async () => {
+          try {
+            const r = await fetch('api/state', {
+              method: 'POST', headers: authHeaders(),
+              body: JSON.stringify({ state: snapshot(), live: { showRanking: liveMirror && showRanking, view: liveMirror ? view : 'main' } }),
+            });
+            setSyncState(r.ok ? 'ok' : r.status === 401 ? 'auth' : 'err');
+          } catch (e) { setSyncState('err'); }
+        }, 250);
+        return () => clearTimeout(t);
+      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage, showRanking, view, liveMirror]);
+
+      const applySaved = (d, keepView) => {
+        if (d.playerCount !== playerCount) skipInit.current = true;
+        setPlayerCount(d.playerCount || 8);
+        setPlayers(d.players || []);
+        setMatches(d.matches || []);
+        setChampionId(d.championId || null);
+        setCustomNames(d.customNames || {});
+        setCustomFlags(d.customFlags || {});
+        setPlayerHp(d.playerHp || {});
+        setTournamentTitle(d.tournamentTitle || 'TOURNAMENT');
+        setTournamentSubtitle(d.tournamentSubtitle || '');
+        setBgTheme(THEMES[d.bgTheme] ? d.bgTheme : 'dark');
+        setBg(normBg(d));
+        setRules(mergeRules(d.rules));
+        setRepechage(d.repechage || null);
+        if (!keepView) setView('main');
+      };
+      // ---------- 配信連動 ----------
+      const matchesRef = useRef(matches); matchesRef.current = matches;
+      const champRef = useRef(championId); champRef.current = championId;
+
+      // 操作画面 → 順位表/復活戦タブの表示状態を配信画面へ送る
+      useEffect(() => {
+        if (RO || SERVER) return;
+        saveJSON(LIVE_KEY, { showRanking: liveMirror && showRanking, view: liveMirror ? view : 'main', t: Date.now() });
+      }, [showRanking, view, liveMirror]);
+
+      // サーバー/他タブからの更新を反映 (配信画面・観戦者)
+      const receiveRemote = (d) => {
+        if (!d || d.kind !== 'bracket-maker-save' || !Array.isArray(d.matches)) return;
+        // 新しく決まった勝者を検出して速報バナーを出す
+        const prev = matchesRef.current;
+        let found = null;
+        d.matches.forEach((round, r) => round.forEach((m, i) => {
+          const old = prev[r] && prev[r][i];
+          const isBye = String(m.player1Id).startsWith('bye-') || String(m.player2Id).startsWith('bye-');
+          if (m.winnerId && !isBye && (!old || old.winnerId !== m.winnerId)) found = { r, id: m.winnerId };
+        }));
+        if (found && found.r < d.matches.length - 1) {
+          const p = (d.players || []).find(x => x.id === found.id);
+          if (p) {
+            const total = d.matches.length;
+            clearTimeout(announceTimer.current);
+            setAnnounce({ key: Date.now(), name: p.name, flag: p.flag, sub: `${roundName(found.r + 1, total)} 勝利 → ${roundName(found.r + 2, total)}へ進出` });
+            announceTimer.current = setTimeout(() => setAnnounce(null), 5500);
+          }
+        }
+        const champChanged = (d.championId || null) !== lastRemoteChamp.current;
+        if (d.championId && champChanged) triggerChampionEffects();
+        lastRemoteChamp.current = d.championId || null;
+        // 観戦者が優勝画面を閉じたあと、他の更新で再び開かないようにする
+        applySaved(champChanged || IS_DISPLAY ? d : { ...d, championId: champRef.current }, true);
+        setSynced(true);
+      };
+      const receiveRef = useRef(null); receiveRef.current = receiveRemote;
+
+      // 配信画面 ← 同一ブラウザの操作画面 (サーバーなしのとき)
+      useEffect(() => {
+        if (!IS_DISPLAY || SERVER) return;
+        const onStorage = (e) => {
+          if (e.key === LIVE_KEY && e.newValue) {
+            try { const l = JSON.parse(e.newValue); setShowRanking(!!l.showRanking); setView(l.view || 'main'); } catch (err) {}
+            return;
+          }
+          if (e.key !== STORAGE_KEY || !e.newValue) return;
+          let d;
+          try { d = JSON.parse(e.newValue); } catch (err) { return; }
+          receiveRef.current(d);
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+      }, []);
+
+      // 観戦者・配信画面 ← サーバー (リアルタイム)
+      useEffect(() => {
+        if (!SERVER || !RO) return;
+        let es, dead = false;
+        const open = () => {
+          es = new EventSource('api/stream');
+          es.onmessage = (ev) => {
+            let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+            setSyncState('ok');
+            if (m.state) receiveRef.current(m.state);
+            if (IS_DISPLAY && m.live) { setShowRanking(!!m.live.showRanking); setView(m.live.view || 'main'); }
+          };
+          es.onerror = () => { setSyncState('err'); };
+        };
+        open();
+        return () => { dead = true; if (es) es.close(); };
+      }, []);
+
+      // 透過/グリーンバック背景 (OBS用)
+      useEffect(() => {
+        if (!IS_DISPLAY || DISPLAY_BG === 'theme') return;
+        document.body.classList.remove('space-bg');
+        const c = DISPLAY_BG === 'green' ? '#00ff00' : 'transparent';
+        document.body.style.background = c;
+        document.documentElement.style.background = c;
+      }, []);
+
+      const displayUrl = (() => {
+        const base = location.href.split('#')[0].split('?')[0];
+        const q = ['display=1'];
+        if (liveBg !== 'theme') q.push(`bg=${liveBg}`);
+        if (liveTitle) q.push('title=1');
+        return `${base}?${q.join('&')}`;
+      })();
+      const handleCopyUrl = async () => {
+        try { await navigator.clipboard.writeText(displayUrl); }
+        catch (e) {
+          const t = document.getElementById('live-url');
+          if (t) { t.select(); document.execCommand('copy'); }
+        }
+        setCopied(true); setTimeout(() => setCopied(false), 1800);
+      };
+      const handleOpenDisplay = () => window.open(displayUrl, 'bracket-display', 'width=1280,height=720');
+
+      const handleExport = () => {
+        const blob = new Blob([JSON.stringify(snapshot(), null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${(tournamentTitle || 'tournament').replace(/[^\w぀-鿿-]+/g, '_')}.json`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      };
+      const handleImport = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const d = JSON.parse(ev.target.result);
+            if (d.kind !== 'bracket-maker-save' || !Array.isArray(d.matches)) throw new Error('format');
+            applySaved(d);
+          } catch (e) { window.alert('読み込みに失敗しました。このサイトで書き出したJSONファイルを選んでください。'); }
+        };
+        reader.readAsText(file);
+      };
+      const handleBulkNames = () => {
+        const lines = bulkText.split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 32);
+        if (lines.length < 3) { window.alert('3人以上の名前を1行ずつ入力してください。'); return; }
+        const names = { ...customNames };
+        lines.forEach((n, i) => { names[`p${i + 1}`] = n; });
+        const flags = { ...customFlags };
+        lines.forEach((n, i) => { if (flags[`p${i + 1}`] === undefined) flags[`p${i + 1}`] = (DEFAULT_PLAYERS[i] || {}).flag || '📍'; });
+        setCustomNames(names);
+        setCustomFlags(flags);
+        const list = lines.map((n, i) => ({ id: `p${i + 1}`, name: n, flag: flags[`p${i + 1}`] }));
+        if (lines.length === playerCount) {
+          initializeTournament(lines.length, list);
+        } else {
+          skipInit.current = false;
+          setPlayerCount(lines.length);   // 人数変更でトーナメントが再生成される
+        }
+        setBulkText('');
+      };
+
+      const showBgDeco = !(IS_DISPLAY && DISPLAY_BG !== 'theme');
+      const customBg = showBgDeco && bg.type !== 'theme';
+      const rootBgStyle = (() => {
+        if (IS_DISPLAY && DISPLAY_BG !== 'theme') return { backgroundImage: 'none', backgroundColor: DISPLAY_BG === 'green' ? '#00ff00' : 'transparent', background: DISPLAY_BG === 'green' ? '#00ff00' : 'transparent' };
+        if (bg.type === 'color') return { background: bg.color };
+        if (bg.type === 'image' && bg.image) {
+          const tile = bg.fit === 'tile';
+          return { backgroundColor: '#0f172a', backgroundImage: `url(${bg.image})`, backgroundSize: tile ? '128px 128px' : bg.fit, backgroundPosition: 'center', backgroundRepeat: tile ? 'repeat' : 'no-repeat', imageRendering: tile ? 'pixelated' : undefined };
+        }
+        if (bg.type === 'image') return { background: '#0f172a' };
+        return undefined;
+      })();
+      if (VIEWER && !synced) {
+        return (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-950 text-white p-8 text-center">
+            <div className="text-5xl">⛏️</div>
+            <div className="text-xl font-black">大会の準備中です</div>
+            <div className="text-sm text-slate-400">主催者が大会を開始すると、ここに自動で表示されます。このまま開いたままお待ちください。</div>
+            {!IS_DISPLAY && <button onClick={adminLogin} className="mt-6 text-xs text-slate-500 hover:text-slate-300 underline cursor-pointer">🔒 管理者ログイン</button>}
+          </div>
+        );
+      }
+      const championPlayer = useMemo(() => players.find(p => p.id === championId), [players, championId]);
+
+      return (
+        <div
+          className={`relative w-full h-full flex flex-col justify-between font-sans overflow-hidden ${(THEMES[bgTheme] || THEMES.earth).rootClass} ${IS_DISPLAY ? 'display-mode' : ''}`}
+          style={rootBgStyle}
+        >
+          {bgTheme === 'earth' && showBgDeco && !customBg && (
+            <>
+              <StarBackground />
+              <Earth />
+            </>
+          )}
+          {bgTheme === 'minecraft' && showBgDeco && !customBg && <MinecraftBackground />}
+          {customBg && bg.type === 'image' && bg.dim > 0 && (
+            <div className="absolute inset-0 z-0 pointer-events-none bg-black" style={{ opacity: bg.dim / 100 }} />
+          )}
+
+          {/* ヘッダー (プレビュー時は非表示) */}
+          {(!isPreviewMode || (VIEWER && !IS_DISPLAY)) && (
+          <header className="mc-header relative z-20 flex justify-between items-center px-8 py-4 bg-slate-950/70 border-b border-slate-800 backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              {bgTheme === 'minecraft'
+                ? <PixelArt rows={GRASS_BLOCK_ROWS} palette={GRASS_BLOCK_PAL} size={4} className="shrink-0 border-2 border-black" />
+                : bgTheme === 'earth'
+                  ? <img src="./logo.png" alt="Logo" className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
+                  : <span className="text-3xl leading-none">🏆</span>}
+              <div>
+                <h1 className="font-outfit font-black text-2xl tracking-wider text-rose-500">{tournamentTitle}</h1>
+                <p className="text-[10px] text-slate-400 tracking-widest uppercase">{tournamentSubtitle}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className="flex items-center h-[34px] text-xs bg-slate-900 border border-slate-800 px-3 rounded-full gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>{VIEWER ? `LIVE ・ ${playerCount} Players` : `Active: ${playerCount} Players`}</span>
+              </div>
+
+              {rules.repechage.enabled && (
+                <div className="flex h-[34px] border border-slate-700">
+                  <button onClick={() => setView('main')} className={`px-3 text-xs font-bold cursor-pointer ${view === 'main' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}>本戦</button>
+                  <button onClick={() => setView('rep')} className={`px-3 text-xs font-bold cursor-pointer ${view === 'rep' ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}>🔄 敗者復活戦</button>
+                </div>
+              )}
+
+              {/* 順位表ページトグル */}
+              <button
+                onClick={() => setShowRanking(true)}
+                className="bg-slate-800 hover:bg-slate-700 text-white h-[34px] px-3 rounded-lg transition border border-slate-700 flex items-center justify-center cursor-pointer font-bold text-xs gap-2 shadow-lg"
+              >
+                <span>🏅</span> 順位表
+              </button>
+
+              {VIEWER && (
+                <button
+                  onClick={adminLogin}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 h-[34px] px-3 rounded-lg transition border border-slate-700 flex items-center justify-center cursor-pointer font-bold text-xs gap-1"
+                  title="主催者用"
+                >🔒 管理者ログイン</button>
+              )}
+
+              {!RO && <button
+                onClick={() => togglePreviewMode(true)}
+                className="bg-slate-800 hover:bg-slate-700 text-white h-[34px] px-3 rounded-lg transition border border-slate-700 flex items-center justify-center cursor-pointer"
+                title="プレビューモード"
+              >
+                <PreviewIcon />
+              </button>}
+
+              {!RO && <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="bg-slate-800 hover:bg-slate-700 text-white h-[34px] px-3 rounded-lg transition border border-slate-700 flex items-center justify-center cursor-pointer"
+              >
+                <SettingsIcon />
+              </button>}
+            </div>
+          </header>
+          )}
+
+          {isPreviewMode && !RO && (
+            <button 
+              onClick={() => setIsPreviewMode(false)}
+              className="absolute bottom-4 right-4 z-[2000] bg-slate-900/50 hover:bg-slate-800 text-slate-400 hover:text-white px-4 py-2 rounded-lg text-sm font-bold backdrop-blur-sm transition-all border border-slate-700/50 shadow-lg cursor-pointer flex items-center gap-2"
+            >
+              プレビュー解除 <kbd className="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-xs">ESC</kbd>
+            </button>
+          )}
+
+          {IS_DISPLAY && DISPLAY_TITLE && (
+            <div className="relative z-20 text-center pt-3 pb-1 pointer-events-none">
+              <h1 className="font-outfit font-black text-3xl tracking-wider text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{tournamentTitle}</h1>
+              {tournamentSubtitle && <p className="text-[11px] text-slate-200 tracking-widest uppercase drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">{tournamentSubtitle}</p>}
+            </div>
+          )}
+
+          {RO && announce && (
+            <div key={announce.key} className="announce absolute left-1/2 bottom-10 z-[2500] flex items-center gap-4 bg-slate-950/90 border-2 border-yellow-400 px-6 py-3 shadow-2xl">
+              <PlayerIcon flag={announce.flag} size={56} />
+              <div>
+                <div className="text-[11px] font-black text-yellow-300 tracking-widest">{announce.sub}</div>
+                <div className="text-3xl font-black text-white leading-tight">{announce.name} <span className="text-yellow-300">WIN!</span></div>
+              </div>
+            </div>
+          )}
+
+          {/* 順位表ページ (全画面オーバーレイ) */}
+          {showRanking && (
+            <div className="mc-overlay absolute inset-0 z-[3000] bg-slate-950 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl">🏅</span>
+                  <h2 className="text-3xl font-black font-outfit text-white tracking-widest">RANKING</h2>
+                </div>
+                {!IS_DISPLAY && <button
+                  onClick={() => setShowRanking(false)}
+                  className="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-6 py-2.5 rounded-xl font-bold text-sm transition shadow-lg border border-slate-700/50"
+                >
+                  閉じる (ESC)
+                </button>}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 md:p-12">
+                <div className="max-w-4xl mx-auto space-y-3 pb-20">
+                  {computeRankings.length === 0 ? (
+                    <div className="text-center text-slate-500 py-12 text-lg font-bold">まだ参加者がいません</div>
+                  ) : (<>
+                    {podiumEntries.length > 0 && <Podium entries={podiumEntries} rules={rules} />}
+                    {listEntries.map((entry, idx) => {
+                      const isFirst = entry.rank === 1;
+                      const isSecond = entry.rank === 2;
+                      const isThird = entry.rank === 3;
+                      const rankColor = isFirst ? 'text-yellow-400' : isSecond ? 'text-slate-300' : isThird ? 'text-amber-600' : 'text-slate-500';
+                      return (
+                        <div
+                          key={entry.player.id}
+                          className={`flex items-center justify-between p-4 sm:p-5 rounded-2xl border transition-all hover:scale-[1.01] ${
+                            isFirst
+                              ? 'bg-yellow-950/20 border-yellow-900/50 shadow-[0_0_20px_rgba(250,204,21,0.15)]'
+                              : isSecond
+                                ? 'bg-slate-800/30 border-slate-700/50'
+                                : isThird
+                                  ? 'bg-amber-950/10 border-amber-900/30'
+                                  : idx % 2 === 0 ? 'bg-slate-900/40 border-slate-800/50' : 'bg-transparent border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4 sm:gap-6">
+                            <div className={`w-14 text-center font-black text-3xl sm:text-4xl ${rankColor}`}>#{entry.rank}</div>
+                            <div className="flex items-center gap-4 sm:gap-6">
+                              <PlayerIcon flag={entry.player.flag} size={56} />
+                              <div>
+                                <div className={`font-black text-2xl sm:text-3xl ${isFirst ? 'text-yellow-400' : 'text-white'}`}>{entry.player.name}</div>
+                                <div className={`text-xs sm:text-sm font-bold mt-1 ${entry.isAlive ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                  {entry.isAlive ? '✨ トーナメント参戦中' : `💀 敗退 (${roundName(entry.wonRounds + 1, numRounds)})`}
+                                  {(entry.isRepChamp || entry.repWins > 0) && (
+                                    <span className="ml-2 text-amber-300">🔄 復活戦{entry.isRepChamp ? ' 優勝' : ` ${entry.repWins}勝`}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          {rules.showScore && (
+                            <div className="text-right">
+                              <div className="text-[10px] sm:text-xs text-slate-500 font-bold mb-1 tracking-widest uppercase">{rules.scoreLabel}</div>
+                              <div className={`text-3xl sm:text-4xl font-black ${entry.totalDamage !== 0 ? 'text-rose-500' : 'text-slate-700'} drop-shadow-lg`}>
+                                {entry.totalDamage.toLocaleString()}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 設定パネル */}
+          <div
+            className={`${RO ? 'hidden' : ''} mc-settings absolute right-0 top-0 h-full w-[26rem] max-w-full bg-slate-950/95 border-l border-slate-800 z-50 p-5 backdrop-blur-lg flex flex-col transition-transform duration-300 ${
+              showSettings && !isPreviewMode ? 'translate-x-0' : 'translate-x-full'
+            }`}
+          >
+            <div className="flex justify-between items-center mb-3 shrink-0">
+              <h3 className="font-outfit font-bold text-lg text-rose-500">大会設定</h3>
+              <div className="flex items-center gap-3">
+                <span className={`text-[10px] ${saveState === 'error' ? 'text-red-400' : 'text-slate-500'}`}>
+                  {saveState === 'error' ? '⚠ 自動保存できません' : ADMIN ? (syncState === 'ok' ? '🌐 公開中・自動保存' : '⚠ 同期エラー') : '💾 自動保存中'}
+                </span>
+                <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-white cursor-pointer text-lg font-bold">✕</button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-1 mb-4 shrink-0">
+              {[['basic', '基本'], ['rules', 'ルール'], ['players', '選手'], ['live', '配信'], ['data', 'データ']].map(([k, label]) => (
+                <button key={k} onClick={() => setSettingsTab(k)}
+                  className={`py-1.5 text-xs font-bold border cursor-pointer ${settingsTab === k ? 'bg-rose-600 border-rose-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-5">
+
+              {settingsTab === 'basic' && (<>
+                <Field label="ゲームプリセット (タイトル・テーマ・ルールを一括設定)">
+                  <div className="flex gap-1">
+                    <select value={presetChoice} onChange={(e) => setPresetChoice(e.target.value)} className={INPUT_CLS}>
+                      <optgroup label="標準プリセット">
+                        {Object.entries(GAME_PRESETS).map(([k, p]) => <option key={k} value={k}>{p.name}</option>)}
+                      </optgroup>
+                      {userPresets.length > 0 && (
+                        <optgroup label="マイプリセット">
+                          {userPresets.map(u => <option key={u.id} value={`user:${u.id}`}>{u.name}</option>)}
+                        </optgroup>
+                      )}
+                    </select>
+                    <button onClick={handleApplyPreset} className="shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-3 cursor-pointer">適用</button>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={handleSavePreset} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-1.5 cursor-pointer">＋ 現在の設定を保存</button>
+                    {presetChoice.startsWith('user:') && (
+                      <button onClick={handleDeletePreset} className="bg-slate-800 hover:bg-red-900 border border-slate-700 text-xs px-3 py-1.5 cursor-pointer">削除</button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">別のゲームでも「現在の設定を保存」で自分用プリセットを作れます。</p>
+                </Field>
+
+                <Field label="大会名 (タイトル)">
+                  <input type="text" value={tournamentTitle} onChange={(e) => setTournamentTitle(e.target.value)} className={INPUT_CLS} />
+                </Field>
+                <Field label="サブタイトル">
+                  <input type="text" value={tournamentSubtitle} onChange={(e) => setTournamentSubtitle(e.target.value)} className={INPUT_CLS} />
+                </Field>
+                <Field label="デザインテーマ (ボタン・パネル・フォント)">
+                  <select value={bgTheme} onChange={(e) => setBgTheme(e.target.value)} className={INPUT_CLS}>
+                    {Object.entries(THEMES).map(([k, t]) => <option key={k} value={k}>{t.label}</option>)}
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1">「マインクラフト」を選ぶとUIがマイクラ風になります。背景は下で自由に変えられます。</p>
+                </Field>
+                <Field label="背景">
+                  <div className="grid grid-cols-3 gap-1">
+                    {[['theme', 'テーマ標準'], ['image', '画像'], ['color', '単色']].map(([k, label]) => (
+                      <button key={k} onClick={() => setBgPart({ type: k })}
+                        className={`py-1.5 text-xs font-bold border cursor-pointer ${bg.type === k ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'}`}>{label}</button>
+                    ))}
+                  </div>
+                  {bg.type === 'image' && (
+                    <div className="mt-2 space-y-2">
+                      <label className="block bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-2 text-center cursor-pointer">
+                        🖼 画像ファイルを選ぶ
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                          const f = e.target.files[0]; e.target.value = '';
+                          if (f) fileToBgData(f, (url) => setBg(prev => ({ ...prev, type: 'image', image: url, fit: prev.fit === 'tile' ? 'cover' : prev.fit })));
+                        }} />
+                      </label>
+                      <input type="text" placeholder="または画像のURL (https://...)" value={bg.image.startsWith('data:') ? '' : bg.image}
+                        onChange={(e) => setBgPart({ image: e.target.value.trim() })} className={INPUT_CLS} />
+                      <div>
+                        <div className="text-[10px] text-slate-500 mb-1">マイクラ風テクスチャ (タイル状に敷き詰め)</div>
+                        <div className="grid grid-cols-4 gap-1">
+                          {[['dirt', '土'], ['stone', '石'], ['planks', '板材'], ['grass_top', '草']].map(([k, label]) => (
+                            <button key={k} onClick={() => setBgPart({ type: 'image', image: `./mc/${k}.svg`, fit: 'tile' })}
+                              className="border border-slate-700 hover:border-emerald-400 text-[10px] cursor-pointer p-0.5 bg-slate-900">
+                              <div className="h-8 w-full" style={{ backgroundImage: `url(./mc/${k}.svg)`, backgroundSize: '32px 32px', imageRendering: 'pixelated' }} />
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <select value={bg.fit} onChange={(e) => setBgPart({ fit: e.target.value })} className={INPUT_CLS}>
+                        <option value="cover">全面に広げる (cover)</option>
+                        <option value="contain">全体を収める (contain)</option>
+                        <option value="tile">タイル状に並べる</option>
+                      </select>
+                      <label className="block text-[11px] text-slate-400">背景を暗くする: {bg.dim}%
+                        <input type="range" min="0" max="85" step="5" value={bg.dim} onChange={(e) => setBgPart({ dim: Number(e.target.value) })} className="w-full" />
+                      </label>
+                    </div>
+                  )}
+                  {bg.type === 'color' && (
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                      <input type="color" value={bg.color} onChange={(e) => setBgPart({ color: e.target.value })} className="h-8 w-12 cursor-pointer bg-transparent" />
+                      {['#1e293b', '#0f172a', '#14532d', '#78350f', '#4c1d95', '#7f1d1d', '#5b9bff'].map(c => (
+                        <button key={c} onClick={() => setBgPart({ color: c })} className="w-6 h-6 border border-slate-600 cursor-pointer" style={{ background: c }} />
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-500 mt-1">背景は観戦者の画面にも反映されます。</p>
+                </Field>
+                <Field label="参加人数 (3〜32人)">
+                  <input type="number" min="3" max="32" value={playerCount}
+                    onChange={(e) => setPlayerCount(Math.max(3, Math.min(32, Number(e.target.value) || 3)))} className={INPUT_CLS} />
+                </Field>
+              </>)}
+
+              {settingsTab === 'rules' && (<>
+                <Section title="① スコアの計算">
+                  <Field label="1勝あたりの得点">
+                    <input type="number" value={rules.pointsPerWin} onChange={(e) => setRule({ pointsPerWin: Number(e.target.value) || 0 })} className={INPUT_CLS} />
+                  </Field>
+                  <Field label="敗退時に入力する数値 (HP・残り点数など) の扱い">
+                    <select value={rules.hpMode} onChange={(e) => setRule({ hpMode: e.target.value })} className={INPUT_CLS}>
+                      <option value="add">スコアに加算する</option>
+                      <option value="subtract">スコアから引く</option>
+                      <option value="ignore">使わない (入力欄も非表示)</option>
+                    </select>
+                  </Field>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="スコアの呼び名"><input type="text" value={rules.scoreLabel} onChange={(e) => setRule({ scoreLabel: e.target.value })} className={INPUT_CLS} /></Field>
+                    <Field label="入力欄の呼び名"><input type="text" value={rules.hpLabel} onChange={(e) => setRule({ hpLabel: e.target.value })} className={INPUT_CLS} /></Field>
+                  </div>
+                </Section>
+
+                <Section title="② 順位の決め方">
+                  <p className="text-[10px] text-slate-500">基本は「勝ち残り状況 → 勝利数 → (復活戦の成績)」の順です。同じ成績だった場合:</p>
+                  <Field label="同成績の扱い">
+                    <select value={rules.tiebreak} onChange={(e) => setRule({ tiebreak: e.target.value })} className={INPUT_CLS}>
+                      <option value="score">スコアの大小で決める</option>
+                      <option value="share">決めずに同順位にする</option>
+                      <option value="seed">シード順 (ブラケット上の並び) で決める</option>
+                    </select>
+                  </Field>
+                  {rules.tiebreak === 'score' && (
+                    <Field label="スコアの優劣">
+                      <select value={rules.rankOrder} onChange={(e) => setRule({ rankOrder: e.target.value })} className={INPUT_CLS}>
+                        <option value="desc">数値が大きいほど上位</option>
+                        <option value="asc">数値が小さいほど上位</option>
+                      </select>
+                    </Field>
+                  )}
+                </Section>
+
+                <Section title="③ 順位表の見せ方">
+                  <Field label="表示スタイル">
+                    <select value={rules.rankView} onChange={(e) => setRule({ rankView: e.target.value })} className={INPUT_CLS}>
+                      <option value="list">リスト表示</option>
+                      <option value="podium">表彰台 (TOP3) + リスト</option>
+                    </select>
+                  </Field>
+                  <Field label="表示する順位の範囲 (0 = 全員)">
+                    <input type="number" min="0" max="32" value={rules.rankTopN} onChange={(e) => setRule({ rankTopN: Math.max(0, Number(e.target.value) || 0) })} className={INPUT_CLS} />
+                  </Field>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={rules.showScore} onChange={(e) => setRule({ showScore: e.target.checked })} />
+                    スコア欄を表示する
+                  </label>
+                </Section>
+
+                <Section title="④ 敗者復活戦">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={rules.repechage.enabled}
+                      onChange={(e) => { setRule({ repechage: { ...rules.repechage, enabled: e.target.checked } }); if (!e.target.checked) { setView('main'); } }} />
+                    敗者復活戦を行う
+                  </label>
+                  {rules.repechage.enabled && (<>
+                    <p className="text-[10px] text-slate-500">指定したラウンドで敗退した選手だけで別のトーナメントを行います。「準決勝敗退者のみ」にすれば3位決定戦になります。</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="対象: ここから">
+                        <select value={rules.repechage.from} onChange={(e) => { const f = Number(e.target.value); setRule({ repechage: { ...rules.repechage, from: f, to: Math.max(f, rules.repechage.to) } }); }} className={INPUT_CLS}>
+                          {repRoundOptions.map(r => <option key={r} value={r}>{roundName(r, numRounds)}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="対象: ここまで">
+                        <select value={rules.repechage.to} onChange={(e) => { const t = Number(e.target.value); setRule({ repechage: { ...rules.repechage, to: t, from: Math.min(t, rules.repechage.from) } }); }} className={INPUT_CLS}>
+                          {repRoundOptions.map(r => <option key={r} value={r}>{roundName(r, numRounds)}</option>)}
+                        </select>
+                      </Field>
+                    </div>
+                    <p className="text-[10px] text-slate-500">ヘッダーの「敗者復活戦」タブから対戦表を作成して進行します。</p>
+                  </>)}
+                </Section>
+              </>)}
+
+              {settingsTab === 'players' && (<>
+                <Field label="選手名を一括入力 (1行に1人 / 3〜32人)">
+                  <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)} rows={5} placeholder={'Steve\nAlex\nCreeper\n...'} className={INPUT_CLS + ' font-mono text-xs'} />
+                  <button onClick={handleBulkNames} className="mt-1 w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-1.5 cursor-pointer">この名前で人数と選手を反映 (トーナメントは再生成)</button>
+                </Field>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wide">選手名とアイコン編集</h4>
+                  <div className="space-y-2.5">
+                    {entryPlayers.map((p, i) => (
+                      <div key={p.id} className="flex gap-2 items-center">
+                        <span className="text-xs text-slate-500 w-5 font-mono">{String(i + 1).padStart(2, '0')}</span>
+                        <div className="flex gap-1 items-center">
+                          <select
+                            value={isImg(p.flag) && !COUNTRY_FLAGS.some(c => c.flag === p.flag) ? 'custom' : p.flag}
+                            onChange={(e) => handlePlayerUpdate(p.id, p.name, e.target.value)}
+                            className="bg-slate-900 border border-slate-800 rounded px-1 py-1 text-xs w-20 text-center focus:outline-none focus:border-rose-500 cursor-pointer"
+                          >
+                            {COUNTRY_FLAGS.map(c => (
+                              <option key={c.flag} value={c.flag}>{isImg(c.flag) ? `🖼️ ${c.name}` : `${c.flag} ${c.name}`}</option>
+                            ))}
+                            {!COUNTRY_FLAGS.some(c => c.flag === p.flag) && <option value={p.flag}>{isImg(p.flag) ? '📁 個別画像' : p.flag}</option>}
+                          </select>
+                          <label className="cursor-pointer bg-slate-800 hover:bg-slate-700 text-white rounded px-2 py-1 text-xs border border-slate-700 flex items-center justify-center">
+                            📁
+                            <input type="file" accept="image/*" className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) { const reader = new FileReader(); reader.onload = (ev) => handlePlayerUpdate(p.id, p.name, ev.target.result); reader.readAsDataURL(file); }
+                              }} />
+                          </label>
+                        </div>
+                        <input type="text" value={p.name} onChange={(e) => handlePlayerUpdate(p.id, e.target.value, p.flag)}
+                          className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs w-full focus:outline-none focus:border-rose-500" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>)}
+
+              {settingsTab === 'live' && (<>
+                <Section title="🌐 公開・観戦 (リアルタイム)">
+                  {!SERVER && (
+                    <p className="text-[11px] text-slate-400 leading-relaxed">いまは<b>ローカルモード</b>です(同期サーバー未接続)。他の人に見せるには、フォルダで <code className="bg-slate-800 px-1">node server.js</code> を起動し、表示されたURLからこのサイトを開き直してください。観戦者は閲覧専用、あなただけが編集できます。</p>
+                  )}
+                  {SERVER && ADMIN && (<>
+                    <p className="text-[11px] text-emerald-300 leading-relaxed">✅ 管理者としてログイン中。ここで入力した勝敗・設定は、観戦者の画面へリアルタイムに反映されます。観戦者は閲覧専用で、設定や勝敗は変更できません。</p>
+                    <div className={`text-[11px] ${syncState === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {syncState === 'ok' ? '● 同期OK' : syncState === 'auth' ? '⚠ ログインが無効です。再ログインしてください' : '⚠ サーバーに送信できません (再試行中)'}
+                    </div>
+                    <Field label="観戦者に配るURL (閲覧専用)">
+                      <input readOnly value={location.href.split('#')[0].split('?')[0]} onFocus={(e) => e.target.select()} className={INPUT_CLS + ' font-mono text-[11px]'} />
+                    </Field>
+                    <button onClick={async () => { try { await navigator.clipboard.writeText(location.href.split('#')[0].split('?')[0]); } catch (e) {} setCopied(true); setTimeout(() => setCopied(false), 1800); }}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black py-2 cursor-pointer">{copied ? '✔ コピーしました' : '観戦URLをコピー'}</button>
+                    <button onClick={() => { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} location.reload(); }}
+                      className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-2 cursor-pointer">ログアウト (閲覧モードで見る)</button>
+                  </>)}
+                </Section>
+                <Section title="📺 配信専用画面">
+                  <p className="text-[11px] text-slate-400 leading-relaxed">ボタン・設定を隠した「映すだけ」の画面を別ウィンドウで開きます。操作画面での勝者入力・順位表の表示は、リアルタイムで反映されます。勝ち上がりごとに速報バナー、優勝時に紙吹雪が出ます。サーバー接続時は、別のPC・OBSのブラウザソースでも連動します。</p>
+                  <Field label="背景">
+                    <select value={liveBg} onChange={(e) => setLiveBg(e.target.value)} className={INPUT_CLS}>
+                      <option value="theme">テーマの背景をそのまま使う</option>
+                      <option value="transparent">透過 (OBSのブラウザソース向け)</option>
+                      <option value="green">グリーンバック (クロマキー用 #00FF00)</option>
+                    </select>
+                  </Field>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={liveTitle} onChange={(e) => setLiveTitle(e.target.checked)} />
+                    大会名を上部に表示する
+                  </label>
+                  <Field label="配信画面のURL">
+                    <input id="live-url" readOnly value={displayUrl} onFocus={(e) => e.target.select()} className={INPUT_CLS + ' font-mono text-[11px]'} />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={handleOpenDisplay} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black py-2 cursor-pointer">別ウィンドウで開く</button>
+                    <button onClick={handleCopyUrl} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-2 cursor-pointer">{copied ? '✔ コピーしました' : 'URLをコピー'}</button>
+                  </div>
+                </Section>
+                <Section title="連動の設定">
+                  <label className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" className="mt-1" checked={liveMirror} onChange={(e) => setLiveMirror(e.target.checked)} />
+                    <span>順位表・敗者復活戦タブの開閉を配信画面にも反映する<br /><span className="text-[10px] text-slate-500">オフにすると、手元で順位表を確認しても配信には映りません。</span></span>
+                  </label>
+                </Section>
+                <Section title="OBSでの使い方">
+                  <ol className="text-[11px] text-slate-400 leading-relaxed list-decimal pl-4 space-y-1">
+                    <li>「別ウィンドウで開く」で配信画面を開き、OBS の <b>ウィンドウキャプチャ</b> で取り込む (背景は「グリーンバック」+ クロマキーが簡単)。</li>
+                    <li>OBS の <b>ブラウザソース</b> にURLを貼る場合、<b>サーバー接続時(node server.js)</b>はどのPCでも連動します。サーバーなしのローカルモードでは、操作画面と同じブラウザ内でのみ連動します。</li>
+                    <li>うまく連動しないときは、配信画面を開き直してください。</li>
+                  </ol>
+                </Section>
+              </>)}
+
+              {settingsTab === 'data' && (<>
+                <Field label="バックアップ (JSONファイル)">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={handleExport} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-2 cursor-pointer">⬇ 書き出し</button>
+                    <label className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs py-2 cursor-pointer text-center">
+                      ⬆ 読み込み
+                      <input type="file" accept="application/json,.json" className="hidden" onChange={(e) => { handleImport(e.target.files[0]); e.target.value = ''; }} />
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-2">進行状況・選手・ルール・復活戦をまるごと保存できます。このブラウザには自動保存もされています (画像を多数入れると容量超過で自動保存できない場合があります)。</p>
+                </Field>
+                <Field label="全データ初期化">
+                  <button onClick={async () => { if (window.confirm('自動保存データを消して初期状態に戻します。' + (ADMIN ? '観戦者の画面からも大会が消えます。' : '') + 'よろしいですか?')) { try { localStorage.removeItem(STORAGE_KEY); } catch (e) {} if (ADMIN) { try { await fetch('api/state', { method: 'DELETE', headers: authHeaders() }); } catch (e) {} } location.reload(); } }}
+                    className="w-full bg-slate-800 hover:bg-red-900 border border-slate-700 text-xs py-2 cursor-pointer">自動保存を消して最初から</button>
+                </Field>
+              </>)}
+            </div>
+
+            <div className="space-y-2 mt-4 pt-4 border-t border-slate-800 shrink-0">
+              <button
+                onClick={() => { setRepechage(null); setPlayerHp({}); initializeTournament(playerCount); }}
+                className="w-full bg-rose-600 hover:bg-rose-500 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-rose-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RotateCcwIcon />
+                トーナメントをリセット
+              </button>
+              <button
+                onClick={() => { setRepechage(null); handleShuffle(); }}
+                className="w-full bg-slate-800 hover:bg-slate-700 py-2.5 rounded-lg text-sm font-semibold border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ShuffleIcon />
+                選手をシャッフル
+              </button>
+            </div>
+          </div>
+
+          {view === 'rep' && rules.repechage.enabled && (
+            <RepBoard rep={repechage} derived={repDerived} pmap={pmap} eligibleIds={repEligible.map(p => p.id)} stale={repStale}
+              rules={rules} totalRounds={numRounds} onGenerate={handleRepGenerate} onPick={handleRepPick} onUndo={handleRepUndo} />
+          )}
+
+          {/* メインボードエリア */}
+          <main ref={mainRef} className={`relative flex-1 min-h-0 flex items-center justify-center overflow-hidden p-2 ${view === 'rep' && rules.repechage.enabled ? 'hidden' : ''}`}>
+            <div className="relative shrink-0" style={{ width: `${baseW * boardScale}px`, height: `${baseH * boardScale}px` }}>
+            <div
+              ref={boardRef}
+              className="absolute left-0 top-0 select-none"
+              style={{
+                width: `${baseW}px`,
+                height: `${baseH}px`,
+                transform: `scale(${boardScale})`,
+                transformOrigin: 'top left',
+              }}
+            >
+              {/* 道路 (接続線) */}
+              {renderRoads()}
+
+              {/* 優勝スロット枠 */}
+              {!championPlayer && (
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10"
+                  style={{ left: `${championCoords.x}px`, top: `${championCoords.y}px` }}
+                >
+                  <div className="flex flex-col items-center justify-center w-24 h-9 border border-dashed border-white/20 bg-slate-900/40 rounded-lg text-white/50 text-[9px] font-black uppercase tracking-widest backdrop-blur-sm shadow-inner">
+                    🏆 CHAMP
+                  </div>
+                </div>
+              )}
+
+              {/* 各試合コントロールパネル (WIN/VS/やり直し) */}
+              {matches.map((round, rIndex) => (
+                <div key={`round-ctrl-${rIndex}`}>
+                  {round.map((match, mIndex) => {
+                    const coords = getMatchCenterCoordinates(rIndex, mIndex);
+                    
+                    if (match.isLocked) {
+                      return null;
+                    }
+
+                    // すでに勝者が決まっている場合：うっすらやり直し（Undo）ボタンを表示
+                    const hasBye = match.player1Id?.startsWith('bye-') || match.player2Id?.startsWith('bye-');
+
+                    if (match.winnerId) {
+                      if (hasBye) return null; // 不戦勝の試合はやり直しボタンを非表示
+                      return !isPreviewMode && (
+                        <div
+                          key={`panel-undo-${match.id}`}
+                          className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-20 pointer-events-auto opacity-40 hover:opacity-100 transition-opacity duration-300"
+                          style={{ left: `${coords.x}px`, top: `${coords.y}px` }}
+                        >
+                          <button
+                            onClick={() => handleUndoWinner(rIndex, mIndex)}
+                            className="bg-slate-950/90 hover:bg-slate-900 border border-slate-700/80 hover:border-slate-500 text-slate-300 hover:text-white rounded-lg px-2.5 py-1 shadow-2xl transition flex items-center justify-center gap-1.5 cursor-pointer text-[10px] font-black"
+                            title="勝者の決定を取り消す"
+                          >
+                            <RotateCcwIcon className="w-3.5 h-3.5" />
+                            <span>やり直し</span>
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    // まだ勝者が決まっていない場合：WIN/VSボタンを表示
+                    return !isPreviewMode && (
+                      <div
+                        key={`panel-${match.id}`}
+                        className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-20 pointer-events-auto"
+                        style={{ left: `${coords.x}px`, top: `${coords.y}px` }}
+                      >
+                        <div 
+                          style={{ width: `${uiConfig.panelW}px` }}
+                          className={`bg-slate-950/95 border border-slate-700/80 backdrop-blur-md px-2 py-1 rounded-xl flex items-center justify-between gap-1 shadow-2xl ${uiConfig.panelH}`}
+                        >
+                          {/* Player 1 WIN ボタン */}
+                          <button
+                            onClick={() => handleSetWinner(rIndex, mIndex, 'player1')}
+                            className={`bg-rose-600 hover:bg-rose-500 rounded-lg text-white font-black transition flex items-center justify-center cursor-pointer shadow-md shadow-rose-600/30 w-[42%] ${uiConfig.btnText}`}
+                          >
+                            {uiConfig.btnLabel || 'WIN'}
+                          </button>
+
+                          <span className={uiConfig.vsText}>VS</span>
+
+                          {/* Player 2 WIN ボタン */}
+                          <button
+                            onClick={() => handleSetWinner(rIndex, mIndex, 'player2')}
+                            className={`bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-black transition flex items-center justify-center cursor-pointer shadow-md shadow-blue-600/30 w-[42%] ${uiConfig.btnText}`}
+                          >
+                            {uiConfig.btnLabel || 'WIN'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {/* プレイヤーピン (敗退していないプレイヤーならどのラウンドのピンであってもダブルクリックで編集可能) */}
+              {players.map((player) => {
+                if (player.isBye) return null; // 完全に見えなくする
+
+                const pCoords = getPlayerCoords(player);
+                const pinX = pCoords.x - uiConfig.pinSize / 2;
+                const pinY = pCoords.y - (uiConfig.pinSize + uiConfig.needleHeight);
+
+                const isChamp = player.position.round === numRounds;
+
+                return (
+                  <div
+                    key={player.id}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      transform: `translate(${pinX}px, ${pinY}px) scale(${isChamp ? 1.25 : 1})`,
+                      transition: 'transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s ease',
+                      zIndex: isChamp ? 100 : player.isLoser ? 15 : 30,
+                      opacity: player.isLoser ? 0.75 : 1,
+                    }}
+                    className="pointer-events-auto"
+                  >
+                    <MapPin
+                      player={player}
+                      isEditable={!player.isLoser}
+                      onPlayerUpdate={handlePlayerUpdate}
+                      isGold={isChamp}
+                      uiConfig={uiConfig}
+                      isPreviewMode={isPreviewMode}
+                    />
+                    {/* 敗退選手のHP入力欄 */}
+                    {!isPreviewMode && player.isLoser && rules.hpMode !== 'ignore' && (
+                      <div
+                        style={{ width: `${uiConfig.pinSize + 20}px` }}
+                        className="flex flex-col items-center mt-1 pointer-events-auto"
+                      >
+                        <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700/70 rounded-lg px-1.5 py-0.5 shadow-lg">
+                          {bgTheme === 'minecraft' ? <img src="mc/heart.svg" alt="" className="w-3 h-auto" style={{ imageRendering: 'pixelated' }} /> : <span className="text-red-400 text-[10px] font-black leading-none select-none">❤️</span>}
+                          <input
+                            type="number"
+                            
+                            max="9999"
+                            placeholder={rules.hpLabel}
+                            value={playerHp[player.id] ?? ''}
+                            onChange={(e) => handleSetHp(player.id, e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                            className="bg-transparent text-center text-white font-black focus:outline-none w-14 text-[10px] placeholder-slate-600"
+                            style={{ MozAppearance: 'textfield' }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            </div>
+          </main>
+
+          {/* 順位表パネル (ヘッダーへ移動しました) */}
+
+          {/* 優勝モーダル */}
+          <div
+            className={`absolute inset-0 bg-slate-950/85 backdrop-blur-sm z-[1000] flex flex-col items-center justify-center transition-all duration-500 ${
+              championPlayer ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            {championPlayer && (
+              <div
+                className={`flex flex-col items-center text-center p-8 max-w-lg transition-transform duration-500 delay-100 ${
+                  championPlayer ? 'scale-100 translate-y-0' : 'scale-50 translate-y-12'
+                }`}
+              >
+                <div className="text-8xl mb-4 animate-bounce">🏆</div>
+
+                <h2 className="font-outfit font-black text-6xl tracking-wider text-yellow-400 drop-shadow-[0_5px_20px_rgba(250,204,21,0.5)] mb-2">
+                  CHAMPION
+                </h2>
+                <p className="text-slate-400 text-xs font-bold tracking-widest uppercase mb-8">
+                  {tournamentTitle} GRAND FINALS WINNER
+                </p>
+
+                <div className="flex gap-4 items-center justify-center bg-gradient-to-r from-yellow-950/40 via-yellow-900/50 to-yellow-950/40 border border-yellow-500/30 p-6 rounded-2xl mb-8 w-80 shadow-2xl">
+                  {isImg(championPlayer.flag) ? (
+                    <img src={championPlayer.flag} className="w-16 h-16 object-cover rounded-full bg-slate-800 border-2 border-yellow-500 shadow-[0_0_15px_rgba(250,204,21,0.5)]" alt="icon" />
+                  ) : (
+                    <span className="text-4xl">{championPlayer.flag}</span>
+                  )}
+                  <div className="text-left">
+                    <span className="text-xs text-yellow-500 font-extrabold uppercase leading-none block mb-1">WINNER</span>
+                    <span className="text-2xl font-outfit font-black text-white">{championPlayer.name}</span>
+                  </div>
+                </div>
+
+                {!IS_DISPLAY && <div className="flex gap-3">
+                  {!VIEWER && <button
+                    onClick={() => initializeTournament(playerCount)}
+                    className="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black px-6 py-3 rounded-xl transition shadow-lg shadow-yellow-500/20 flex items-center gap-2 cursor-pointer"
+                  >
+                    <RotateCcwIcon className="stroke-[3px]" />
+                    もう一度プレイ
+                  </button>}
+                  <button
+                    onClick={() => {
+                      setChampionId(null);
+                    }}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-6 py-3 rounded-xl border border-slate-700 transition cursor-pointer"
+                  >
+                    ブラケットを見る
+                  </button>
+                  <button
+                    onClick={() => {
+                      setChampionId(null);
+                      setShowRanking(true);
+                    }}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-6 py-3 rounded-xl border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    🏅 順位表
+                  </button>
+                </div>}
+              </div>
+            )}
+          </div>
+
+          {/* フッター */}
+          {!RO && (<footer className="mc-footer relative z-20 px-8 py-3 bg-slate-950/40 text-center border-t border-slate-900/60 backdrop-blur-sm flex justify-between items-center text-[10px] text-slate-500">
+            <div>&copy; 2026 {tournamentTitle}. Tournament Bracket Maker.</div>
+            <div className="flex gap-4">
+              <span>ダブルクリックで選手名・アイコン変更 (1回戦のみ)</span>
+              <span>&bull;</span>
+              <span>ピンの下に名前を常時表示</span>
+            </div>
+          </footer>)}
+        </div>
+      );
+    }
+
+    async function boot() {
+      if (/^https?:$/.test(location.protocol)) {
+        try {
+          const r = await fetch('api/state', { cache: 'no-store' });
+          if (r.ok) { const j = await r.json(); if (j && typeof j === 'object' && 'rev' in j) { SERVER = true; REMOTE = j; } }
+        } catch (e) { /* サーバーなし: ローカルモード */ }
+      }
+      if (SERVER) {
+        if (!IS_DISPLAY) {
+          try { TOKEN = localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { TOKEN = ''; }
+          if (TOKEN) {
+            try {
+              const r = await fetch('api/login', { method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN } });
+              ADMIN = r.ok;
+              if (r.status === 401) { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+            } catch (e) { ADMIN = false; }
+          }
+        }
+        VIEWER = !ADMIN;
+        RO = IS_DISPLAY || VIEWER;
+      }
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    }
+    boot();
+  </script>
+</body>
+</html>

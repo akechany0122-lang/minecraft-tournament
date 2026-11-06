@@ -1,0 +1,244 @@
+/* GEO GUESSR RPG杯 Bracket Custom Styles */
+
+/* 宇宙背景（地球水平線画像を使用し、主張を抑えるために濃いオーバーレイを重ねる） */
+.space-bg {
+  background-image: 
+    linear-gradient(rgba(3, 7, 18, 0.72), rgba(3, 7, 18, 0.72)),
+    url('earth_horizon.jpg');
+  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.1; transform: scale(0.8); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+.star {
+  position: absolute;
+  background-color: white;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* 旧地球スタイルは不要 */
+.earth-container {
+  display: none;
+}
+.earth-sphere {
+  display: none;
+}
+
+/* 黄金のオーラ */
+@keyframes gold-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(250, 204, 21, 0.5), 0 0 30px rgba(250, 204, 21, 0.2);
+    filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.6));
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(250, 204, 21, 0.8), 0 0 60px rgba(250, 204, 21, 0.4);
+    filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.9));
+  }
+}
+
+.winner-glow {
+  animation: gold-glow 2s infinite ease-in-out;
+}
+
+/* スクロールバー非表示 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* マップピンのホバーアニメーション */
+.pin-card {
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.5));
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pin-card:hover {
+  transform: translateY(-2px) scale(1.08);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.7));
+}
+
+svg {
+  pointer-events: none;
+}
+svg path {
+  pointer-events: stroke;
+}
+
+
+/* =====================================================================
+   MINECRAFT THEME  (背景テーマ「マインクラフト」選択時に .mc-theme が付く)
+   ===================================================================== */
+
+.mc-theme {
+  background: linear-gradient(#5b9bff 0%, #8ec3ff 55%, #c9e6ff 100%);
+  image-rendering: pixelated;
+}
+
+/* ---- フォント: 全体をピクセルフォントに ---- */
+.mc-theme,
+.mc-theme *:not(svg):not(path) {
+  font-family: 'DotGothic16', 'Press Start 2P', monospace !important;
+  letter-spacing: 0.02em;
+}
+.mc-theme .font-outfit { font-family: 'Press Start 2P', 'DotGothic16', monospace !important; }
+.mc-theme h1.font-outfit { font-size: 1.15rem; line-height: 1.5; }
+.mc-theme h1 { color: #fff; text-shadow: 3px 3px 0 #3f3f3f; }
+.mc-theme h2.font-outfit, .mc-theme h3.font-outfit { text-shadow: 3px 3px 0 #3f3f3f; }
+.mc-theme .winner-glow { animation: none; box-shadow: 0 0 0 3px #fff7a8, 0 0 22px 4px rgba(255, 214, 10, .8); }
+
+/* ---- 角丸を全部なくす ---- */
+.mc-theme [class*="rounded"] { border-radius: 0 !important; }
+
+/* ---- 暗いパネル類 → 石ブロック風 ---- */
+.mc-theme [class*="bg-slate-9"],
+.mc-theme [class*="bg-slate-950"] {
+  background-color: rgba(38, 38, 38, .94) !important;
+  backdrop-filter: none !important;
+}
+.mc-theme header.mc-header,
+.mc-theme .mc-settings {
+  background-color: #6b6b6b !important;
+  background-image: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.35)), url('mc/stone.svg');
+  background-size: auto, 64px;
+  border-color: #000 !important;
+}
+.mc-theme header.mc-header { border-bottom: 4px solid #000 !important; box-shadow: inset 0 -4px 0 #555; }
+.mc-theme .mc-settings { border-left: 4px solid #000 !important; }
+.mc-theme .mc-overlay {
+  background-color: #3a2a1c !important;
+  background-image: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,.55)), url('mc/dirt.svg');
+  background-size: auto, 64px;
+}
+.mc-theme footer.mc-footer {
+  background: rgba(0,0,0,.6) !important;
+  border-top: 4px solid #000 !important;
+  color: #ddd;
+}
+
+/* ---- ボタン (石のボタン) ---- */
+.mc-theme button,
+.mc-theme label[class*="bg-slate-8"] {
+  background-color: #8b8b8b !important;
+  color: #fff;
+  text-shadow: 2px 2px 0 #3f3f3f;
+  border: 2px solid #000 !important;
+  box-shadow: inset -3px -3px 0 #555, inset 3px 3px 0 #c6c6c6;
+}
+.mc-theme button:hover { filter: brightness(1.15); }
+.mc-theme button:active { box-shadow: inset 3px 3px 0 #555, inset -3px -3px 0 #c6c6c6; }
+
+/* 勝利ボタン (チーム色を保ったブロック風) */
+.mc-theme button[class*="bg-rose-6"] {
+  background-color: #d63a3a !important;
+  box-shadow: inset -3px -3px 0 #8c1f1f, inset 3px 3px 0 #ff8a8a;
+}
+.mc-theme button[class*="bg-blue-6"] {
+  background-color: #3a6fd6 !important;
+  box-shadow: inset -3px -3px 0 #1f3f8c, inset 3px 3px 0 #8ab0ff;
+}
+.mc-theme button[class*="bg-yellow-5"] {
+  background-color: #f2c200 !important;
+  color: #3a2a00; text-shadow: none;
+  box-shadow: inset -3px -3px 0 #a07d00, inset 3px 3px 0 #fff0a0;
+}
+
+/* ---- 入力欄 (黒背景 + 灰色枠) ---- */
+.mc-theme input,
+.mc-theme select,
+.mc-theme textarea {
+  background-color: #000 !important;
+  color: #fff;
+  border: 2px solid #a0a0a0 !important;
+  border-radius: 0 !important;
+}
+.mc-theme input:focus, .mc-theme select:focus { border-color: #fff !important; outline: none; }
+
+/* ---- 枠線 ---- */
+.mc-theme [class*="border-slate"] { border-color: #000 !important; }
+
+/* ---- アクセントカラー ---- */
+.mc-theme .text-rose-500 { color: #ffff55; }
+.mc-theme .text-yellow-400 { color: #ffd800; }
+.mc-theme .text-emerald-400 { color: #55ff55; }
+
+/* ---- ピン: 丸 → ブロック ---- */
+.mc-theme .pin-head {
+  border-radius: 0 !important;
+  border-width: 4px !important;
+  border-color: #000 !important;
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,.28), inset 4px 4px 0 rgba(255,255,255,.28), 0 4px 0 rgba(0,0,0,.35);
+}
+.mc-theme .pin-head img { image-rendering: pixelated; }
+.mc-theme .pin-needle { visibility: hidden; }
+.mc-theme .pin-card, .mc-theme .pin-name { border-color: #000 !important; }
+
+/* ---- ブラケット線: レッドストーン回路風 ---- */
+.mc-theme .bracket-svg path { stroke-linecap: square; stroke-linejoin: miter; stroke-width: 12px; }
+.mc-theme .bracket-svg path:not([stroke="#ffffff"]) { stroke: rgba(0, 0, 0, .38); }
+.mc-theme .bracket-svg path[stroke="#ffffff"] {
+  stroke: #5dff5d;
+  filter: drop-shadow(0 0 6px rgba(93, 255, 93, .95)) !important;
+}
+
+/* ---- 背景デコレーション ---- */
+.mc-world { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.mc-sun {
+  position: absolute; top: 9%; right: 12%;
+  width: 84px; height: 84px; background: #fff3a8;
+  box-shadow: 0 0 0 10px rgba(255, 243, 168, .45), 0 0 0 24px rgba(255, 243, 168, .22), 0 0 70px 30px rgba(255, 240, 150, .5);
+}
+.mc-cloud {
+  position: absolute; left: -300px;
+  height: 36px; width: 180px; background: rgba(255,255,255,.92);
+  box-shadow:
+    36px -36px 0 0 rgba(255,255,255,.92), 72px -36px 0 0 rgba(255,255,255,.92),
+    108px -36px 0 0 rgba(255,255,255,.92), -36px 0 0 0 rgba(255,255,255,.92),
+    216px 0 0 0 rgba(255,255,255,.92), 0 6px 0 0 rgba(200,220,245,.8);
+  animation: mc-drift linear infinite;
+}
+@keyframes mc-drift { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 700px)); } }
+.mc-hills { position: absolute; left: 0; right: 0; background-repeat: repeat-x; background-position: left bottom; }
+.mc-hills-far  { bottom: 150px; height: 192px; background-image: url('mc/hills_far.svg');  background-size: 640px 192px; opacity: .85; }
+.mc-hills-near { bottom: 140px; height: 192px; background-image: url('mc/hills_near.svg'); background-size: 640px 192px; background-position: 220px bottom; }
+.mc-ground {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 190px;
+  background-image: url('mc/grass_side.svg'), url('mc/ores.svg'), url('mc/dirt.svg');
+  background-size: 64px 64px, 256px 128px, 64px 64px;
+  background-repeat: repeat-x, repeat-x, repeat;
+  background-position: 0 0, 0 70px, 0 0;
+}
+.mc-ground::after {
+  content: ''; position: absolute; inset: 64px 0 0 0;
+  background: linear-gradient(rgba(0,0,0,.0), rgba(0,0,0,.5));
+}
+.mc-deco { position: absolute; bottom: 160px; shape-rendering: crispEdges; image-rendering: pixelated; }
+.mc-tree-l { left: 3%; } .mc-tree-r { right: 4%; } .mc-creeper { right: 17%; bottom: 160px; }
+.mc-world svg { pointer-events: none; }
+
+/* ピクセルアート画像 (アバター等) をぼかさない */
+img[src$=".svg"], img[src$=".png"][src^="mc/"] { image-rendering: pixelated; }
+.mc-theme textarea { background-color: #000 !important; color: #fff; border: 2px solid #a0a0a0 !important; border-radius: 0 !important; }
+.mc-theme optgroup { background: #000; color: #ccc; }
+.mc-theme .text-rose-400 { color: #ffff55; }
+.mc-theme .mc-settings .text-slate-500, .mc-theme .mc-settings .text-slate-400 { color: #d0d0d0; }
+
+/* ---- 配信専用画面 ---- */
+.display-mode, .display-mode * { cursor: none !important; }
+@keyframes announce-in {
+  0% { transform: translate(-50%, 140%); opacity: 0; }
+  12% { transform: translate(-50%, 0); opacity: 1; }
+  88% { transform: translate(-50%, 0); opacity: 1; }
+  100% { transform: translate(-50%, 140%); opacity: 0; }
+}
+.announce { animation: announce-in 5.5s ease-in-out forwards; }

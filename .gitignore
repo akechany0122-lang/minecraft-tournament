@@ -1,0 +1,6 @@
+data/
+node_modules/
+.DS_Store
+.claude/
+*.py
+.claude_launch_tmp

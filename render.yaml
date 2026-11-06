@@ -1,0 +1,12 @@
+# Render Blueprint: GitHub のリポジトリを接続するだけでデプロイできます
+services:
+  - type: web
+    name: tournament-bracket
+    runtime: node
+    plan: free
+    buildCommand: echo "no build"
+    startCommand: node server.js
+    healthCheckPath: /api/state
+    envVars:
+      - key: ADMIN_PASSWORD   # デプロイ時に入力を求められます (管理者パスワード)
+        sync: false

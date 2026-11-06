@@ -1,0 +1,9 @@
+{
+  "name": "tournament-bracket-maker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Game tournament bracket site with realtime read-only viewing and admin-only editing",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
