@@ -752,6 +752,7 @@
       const [rules, setRules] = useState(() => mergeRules(saved?.rules ?? GAME_PRESETS.geoguessr.rules));
       const setRule = (patch) => setRules(prev => ({ ...prev, ...patch }));
       const [repechage, setRepechage] = useState(saved?.repechage ?? null);
+      const [playoffs, setPlayoffs] = useState(saved?.playoffs ?? []);   // 同順位決定戦: [{id, a, b, w:'a'|'b'|null}]
       const [view, setView] = useState(() => (IS_DISPLAY && (initLive() || {}).view) || 'main');
       const [settingsTab, setSettingsTab] = useState('basic');
       const [userPresets, setUserPresets] = useState(() => loadJSON(PRESET_KEY) || []);
@@ -1030,6 +1031,14 @@
           });
 
         const useScore = rules.tiebreak === 'score';
+        // 同順位決定戦: 「同成績」のグループ内で行われた試合の勝利数
+        allPlayers.forEach(e => { e.baseKey = `${e.isAlive}|${e.wonRounds}|${e.repWins}|${useScore ? e.totalDamage : ''}`; e.poWins = 0; });
+        const byId = Object.fromEntries(allPlayers.map(e => [e.player.id, e]));
+        playoffs.forEach(m => {
+          const A = byId[m.a], B = byId[m.b];
+          if (!A || !B || !m.w || A.baseKey !== B.baseKey) return;
+          (m.w === 'a' ? A : B).poWins += 1;
+        });
         allPlayers.sort((a, b) => {
           if (a.isAlive !== b.isAlive) return a.isAlive ? -1 : 1;
           if (b.wonRounds !== a.wonRounds) return b.wonRounds - a.wonRounds;
@@ -1037,6 +1046,7 @@
           if (useScore && a.totalDamage !== b.totalDamage) {
             return rules.rankOrder === 'asc' ? a.totalDamage - b.totalDamage : b.totalDamage - a.totalDamage;
           }
+          if (b.poWins !== a.poWins) return b.poWins - a.poWins;
           return a.seedIdx - b.seedIdx;
         });
 
@@ -1045,12 +1055,33 @@
           if (idx > 0) {
             const prev = allPlayers[idx - 1];
             const same = prev.isAlive === entry.isAlive && prev.wonRounds === entry.wonRounds && prev.repWins === entry.repWins
-              && rules.tiebreak !== 'seed' && (!useScore || prev.totalDamage === entry.totalDamage);
+              && rules.tiebreak !== 'seed' && (!useScore || prev.totalDamage === entry.totalDamage) && prev.poWins === entry.poWins;
             if (!same) currentRank = idx + 1;
           }
           return { rank: currentRank, ...entry };
         });
-      }, [players, winsMap, playerHp, championId, rules, repDerived]);
+      }, [players, winsMap, playerHp, championId, rules, repDerived, playoffs]);
+
+      // 同成績の選手グループ (決定戦の対象)
+      const tieGroups = useMemo(() => {
+        const g = {};
+        computeRankings.forEach(e => { (g[e.baseKey] = g[e.baseKey] || []).push(e); });
+        return Object.values(g).filter(a => a.length >= 2 && a.length <= 8);
+      }, [computeRankings]);
+      const playoffCreate = (group) => {
+        const ids = group.map(e => e.player.id);
+        const has = (x, y) => playoffs.some(m => (m.a === x && m.b === y) || (m.a === y && m.b === x));
+        const add = [];
+        for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+          if (!has(ids[i], ids[j])) add.push({ id: `po-${Date.now()}-${i}-${j}`, a: ids[i], b: ids[j], w: null });
+        }
+        if (add.length) setPlayoffs(prev => [...prev, ...add]);
+      };
+      const playoffPick = (id, w) => setPlayoffs(prev => prev.map(m => m.id === id ? { ...m, w: m.w === w ? null : w } : m));
+      const playoffClear = (group) => {
+        const set = new Set(group.map(e => e.player.id));
+        setPlayoffs(prev => prev.filter(m => !(set.has(m.a) && set.has(m.b))));
+      };
 
 
       const handlePlayerUpdate = (id, newName, newFlag) => {
@@ -1224,6 +1255,7 @@
       useEffect(() => {
         if (skipInit.current) { skipInit.current = false; return; }
         setRepechage(null);
+        setPlayoffs([]);
         initializeTournament(playerCount);
       }, [playerCount]);
 
@@ -1627,6 +1659,7 @@
         setCustomFlags(flags);
         setPlayerHp({});
         setRepechage(null);
+        setPlayoffs([]);
         setView('main');
         initializeTournament(playerCount, list.slice(0, playerCount).map((x, i) => ({ id: `p${i + 1}`, ...x })));
       };
@@ -1664,14 +1697,14 @@
       const snapshot = () => ({
         kind: 'bracket-maker-save', version: 2,
         playerCount, players, matches, championId, customNames, customFlags, playerHp,
-        tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage,
+        tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage, playoffs,
       });
 
       useEffect(() => {
         if (!matches.length || RO) return;
         const ok = saveJSON(STORAGE_KEY, snapshot());
         setSaveState(ok ? 'saved' : 'error');
-      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage]);
+      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage, playoffs]);
 
       // 管理者 → サーバーへ送信 (観戦者へリアルタイム配信される)
       useEffect(() => {
@@ -1686,7 +1719,7 @@
           } catch (e) { setSyncState('err'); }
         }, 250);
         return () => clearTimeout(t);
-      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage, showRanking, view, liveMirror]);
+      }, [playerCount, players, matches, championId, customNames, customFlags, playerHp, tournamentTitle, tournamentSubtitle, bgTheme, bg, rules, repechage, playoffs, showRanking, view, liveMirror]);
 
       const applySaved = (d, keepView) => {
         if (d.playerCount !== playerCount) skipInit.current = true;
@@ -1703,6 +1736,7 @@
         setBg(normBg(d));
         setRules(mergeRules(d.rules));
         setRepechage(d.repechage || null);
+        setPlayoffs(d.playoffs || []);
         if (!keepView) setView('main');
       };
       // ---------- 配信連動 ----------
@@ -1994,6 +2028,44 @@
                     <div className="text-center text-slate-500 py-12 text-lg font-bold">まだ参加者がいません</div>
                   ) : (<>
                     {podiumEntries.length > 0 && <Podium entries={podiumEntries} rules={rules} />}
+                    {tieGroups.map(group => {
+                      const ids = new Set(group.map(e => e.player.id));
+                      const ms = playoffs.filter(m => ids.has(m.a) && ids.has(m.b));
+                      if (RO && ms.length === 0) return null;
+                      const nm = (id) => (pmap[id] || {}).name || '?';
+                      const need = group.length * (group.length - 1) / 2 - ms.length;
+                      return (
+                        <div key={group.map(e => e.player.id).join('-')} className="po-card border-2 border-amber-500/60 bg-amber-950/20 p-4 rounded-2xl">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div className="font-black text-amber-300 text-lg">⚔ 同順位決定戦 <span className="text-sm text-amber-200/80 font-bold">{group.map(e => e.player.name).join(' / ')} (#{group[0].rank} タイ)</span></div>
+                            {!RO && (
+                              <div className="flex gap-2">
+                                {need > 0 && <button onClick={() => playoffCreate(group)} className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black px-3 py-1.5 cursor-pointer">{ms.length ? '不足分の試合を追加' : '決定戦を作成 (総当たり)'}</button>}
+                                {ms.length > 0 && <button onClick={() => playoffClear(group)} className="bg-slate-800 hover:bg-red-900 border border-slate-700 text-xs px-3 py-1.5 cursor-pointer">決定戦をやめる</button>}
+                              </div>
+                            )}
+                          </div>
+                          {ms.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {ms.map(m => (
+                                <div key={m.id} className="flex items-center gap-2 text-white">
+                                  {['a', 'b'].map((side, i) => (
+                                    <React.Fragment key={side}>
+                                      {i === 1 && <span className="text-slate-500 text-xs font-black">VS</span>}
+                                      <button disabled={RO} onClick={() => playoffPick(m.id, side)}
+                                        className={`flex-1 px-3 py-2 text-sm font-black border-2 ${RO ? '' : 'cursor-pointer'} ${m.w === side ? 'bg-emerald-600 border-emerald-300 text-white' : m.w ? 'bg-slate-900/60 border-slate-700 text-slate-500 line-through' : 'bg-slate-800 border-slate-600 hover:border-amber-400'}`}>
+                                        {m.w === side ? '🏆 ' : ''}{nm(m[side])}
+                                      </button>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              ))}
+                              {!RO && <div className="text-[10px] text-slate-400">名前を押すと勝者に決定(もう一度押すと取り消し)。決定戦の勝利数が多い順に順位が確定します。</div>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     {listEntries.map((entry, idx) => {
                       const isFirst = entry.rank === 1;
                       const isSecond = entry.rank === 2;
@@ -2020,6 +2092,7 @@
                                 <div className={`font-black text-2xl sm:text-3xl ${isFirst ? 'text-yellow-400' : 'text-white'}`}>{entry.player.name}</div>
                                 <div className={`text-xs sm:text-sm font-bold mt-1 ${entry.isAlive ? 'text-emerald-400' : 'text-slate-500'}`}>
                                   {entry.isAlive ? '✨ トーナメント参戦中' : `💀 敗退 (${roundName(entry.wonRounds + 1, numRounds)})`}
+                                  {entry.poWins > 0 && <span className="ml-2 text-amber-300">⚔ 決定戦 {entry.poWins}勝</span>}
                                   {(entry.isRepChamp || entry.repWins > 0) && (
                                     <span className="ml-2 text-amber-300">🔄 復活戦{entry.isRepChamp ? ' 優勝' : ` ${entry.repWins}勝`}</span>
                                   )}
@@ -2355,14 +2428,14 @@
 
             <div className="space-y-2 mt-4 pt-4 border-t border-slate-800 shrink-0">
               <button
-                onClick={() => { setRepechage(null); setPlayerHp({}); initializeTournament(playerCount); }}
+                onClick={() => { setRepechage(null); setPlayoffs([]); setPlayerHp({}); initializeTournament(playerCount); }}
                 className="w-full bg-rose-600 hover:bg-rose-500 py-2.5 rounded-lg text-sm font-bold shadow-lg shadow-rose-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <RotateCcwIcon />
                 トーナメントをリセット
               </button>
               <button
-                onClick={() => { setRepechage(null); handleShuffle(); }}
+                onClick={() => { setRepechage(null); setPlayoffs([]); handleShuffle(); }}
                 className="w-full bg-slate-800 hover:bg-slate-700 py-2.5 rounded-lg text-sm font-semibold border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ShuffleIcon />
